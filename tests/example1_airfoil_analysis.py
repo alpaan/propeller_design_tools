@@ -1,7 +1,7 @@
 import propeller_design_tools as pdt
 
 
-pdt.set_airfoil_database(r'D:\Python Projects\propeller_design_tools\foil_database')
+pdt.set_airfoil_database(r"C:\Users\Jake\Desktop\Python Projects\propeller_design_tools\foil_database")
 # pdt.clear_foil_database()
 
 foil = pdt.Airfoil(name='clarky')

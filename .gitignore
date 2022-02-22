@@ -139,3 +139,4 @@ cython_debug/
 /.idea/
 /foil_database/
 /prop_database/
+/dist_archive/0.0.XX/
