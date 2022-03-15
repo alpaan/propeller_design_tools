@@ -1,9 +1,13 @@
 import propeller_design_tools as pdt
 
 
-prop = pdt.Propeller('MyPropeller')
-prop.plot_geometry()
-prop.plot_ideal_eff()
+# pdt.set_airfoil_database('C:/test1234')
+
+pdt.start_ui()
+
+# prop = pdt.Propeller('MyPropeller')
+# prop.plot_geometry()
+# prop.plot_ideal_eff()
 
 
 # nblades: 3

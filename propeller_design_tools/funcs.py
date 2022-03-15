@@ -7,7 +7,7 @@ from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.radialstation import RadialStation
 from propeller_design_tools.propeller import Propeller
 from propeller_design_tools.user_io import Info, Error
-from propeller_design_tools.user_settings import _get_user_settings, get_prop_db
+from propeller_design_tools.user_settings import _get_user_settings, get_prop_db, get_foil_db
 
 
 # =============== CONVENIENCE / UTILITY FUNCTIONS ===============
@@ -64,6 +64,34 @@ def delete_files_from_folder(folder: str):
                 os.remove(fpath)
     else:
         raise Error('Cannot find folder: {}'.format(folder))
+
+
+def count_airfoil_db():
+    return len(get_all_airfoil_files())
+
+
+def count_propeller_db():
+    return len(get_all_propeller_dirs())
+
+
+def get_all_airfoil_files():
+    af_db = get_foil_db()
+    fnames = []
+    for fname in os.listdir(af_db):
+        if os.path.splitext(fname)[1] in ['.dat', '.txt']:
+            fnames.append(fname)
+    return fnames
+
+
+def get_all_propeller_dirs():
+    prop_db = get_prop_db()
+    dirnames = []
+    for name in os.listdir(prop_db):
+        pth = os.path.join(prop_db, name)
+        if os.path.isdir(pth):
+            if any([os.path.splitext(p)[1] == '.meta' for p in os.listdir(pth)]):
+                dirnames.append(name)
+    return dirnames
 
 
 def search_files(folder: str, search_strs: list = None, contains_any: bool = False, include_dirs: bool = False):
@@ -873,3 +901,17 @@ def generate_3D_profile_points(nondim_xy_coords: np.ndarray, radius: float, axis
     zs = yp
 
     return np.vstack([xs, ys, zs])
+
+
+# ===== USER INTERFACE STUFF =====
+def start_ui():
+    from PyQt5 import QtWidgets
+    import sys
+    from propeller_design_tools.user_interface import InterfaceMainWindow
+
+    app = QtWidgets.QApplication(sys.argv)
+    w = InterfaceMainWindow()
+    w.show()
+    app.exec_()
+
+    return

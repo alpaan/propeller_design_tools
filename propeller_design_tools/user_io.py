@@ -83,3 +83,8 @@ class Error(Exception):
         if errplot:
             error_plot(**errplot_kwargs)
         super().__init__('\nPDT ERROR: {}'.format(s.replace('\n', '\n           ')))
+
+
+class Input:
+    def __init__(self, s: str):
+        self.response = input('\n PDT INPUT: {}'.format(s.replace('\n', '\n           ')))

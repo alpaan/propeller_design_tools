@@ -1,9 +1,24 @@
 import sys
 import os
-from propeller_design_tools.user_io import Error
+from propeller_design_tools.user_io import Error, Input, Info
 
 
 def set_airfoil_database(path: str):
+    if not os.path.exists(path):
+        yes_or_no = Input('Specified airfoil database directory does not yet exist, would you like PDT to create it? '
+                          '(Y/N)').response
+
+        make = False
+        if len(yes_or_no) == 1:
+            if 'y' in yes_or_no.lower():
+                make = True
+        else:
+            if 'yes' in yes_or_no.lower():
+                make = True
+        if make:
+            os.mkdir(path)
+            Info(s='Created directory "{}"'.format(path), indent_level=1)
+
     _save_settings({'airfoil_database': path})
     return
 

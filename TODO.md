@@ -17,14 +17,16 @@ the chords of each station are, so we can update the "1/10th of the local radius
 * Work on propeller "analysis sweeps" to gain access to more of the XROTOR functionality
 (example5_prop_analysis.py)
 * Work on propeller optimization routines (example6_grid_optimizer.py)
+* Make it all work as long as XFOIL and XROTOR are in the env. variables?
 
 Wishlist (low-priority)
 -----------------------
 * Get Gud at coding - obtain & integrate XFOIL and XROTOR source code such that 
 the user no longer needs to get the executables themselves, the entire package is
-finally self-contained
+finally self-contained - or other ways to make PDT a "complete package"
 * Consider ways to automate the downloading of coordinate files
 * Consider ways to automate the generation of airfoil polar data
 * Consider ways to generate hub and blade/hub interface geometries
 * Consider ways to "cut in" in the blade chords near the hub when using 
 design_vorform='pot'
+* Finish the user-interface
