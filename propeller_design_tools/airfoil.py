@@ -3,6 +3,8 @@ import warnings
 from propeller_design_tools import funcs
 from propeller_design_tools.user_io import Error, Info
 from propeller_design_tools.user_settings import _get_user_settings
+import matplotlib
+matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import griddata, interp1d
@@ -348,8 +350,10 @@ class Airfoil(object):
         if fig is None:
             fig = plt.figure(figsize=(10, 8))
             ax = fig.add_subplot(111)
+            subpl_adj_rt = 0.81
         else:
             ax = fig.axes[0]
+            subpl_adj_rt = 0.77
 
         # plot em
         for re_key in re_list:
@@ -365,7 +369,7 @@ class Airfoil(object):
                     plot_kwargs['marker'] = marker_cycle[ncrit_list.index(ncrit_key) % len(marker_cycle)]
                     if (re_key, mach_key, ncrit_key) in pol_data.keys():
                         d = pol_data[(re_key, mach_key, ncrit_key)]
-                        ax.plot(d[x_param], d[y_param], label='{}, {}, {}'.format(re_key, mach_key, ncrit_key), **plot_kwargs)
+                        ax.plot(d[x_param], d[y_param], label='{:.1e}, {}, {}'.format(re_key, mach_key, ncrit_key), **plot_kwargs)
                     else:
                         print('Warning: Cannot find polar for {} @ Re = {}, Mach = {}, Ncrit = {}, skipping this one...'
                               .format(self.name, re_key, mach_key, ncrit_key))
@@ -379,7 +383,7 @@ class Airfoil(object):
         if xlims is not None:
             ax.set_xlim(xlims)
         ax.legend(loc='upper left', title='Re, Mach, Ncrit', bbox_to_anchor=(1.01, 1.0))
-        fig.subplots_adjust(left=0.09, right=0.79)
+        fig.subplots_adjust(left=0.09, right=subpl_adj_rt)
 
         return fig, ax
 

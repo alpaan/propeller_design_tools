@@ -1,6 +1,7 @@
 import os
 from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
-from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db
+from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db, delete_all_widgets_from_layout
+from propeller_design_tools.airfoil import Airfoil
 import sys
 from io import StringIO
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
@@ -97,12 +98,14 @@ class PDT_CheckBox(QtWidgets.QCheckBox):
         italic = kwargs.pop('italic') if 'italic' in kwargs else False
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+        checked = kwargs.pop('checked') if 'checked' in kwargs else False
 
         super(PDT_CheckBox, self).__init__(*args, **kwargs)
 
         self.set_italic(italic=italic)
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
+        self.set_checked(checked=checked)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -118,6 +121,9 @@ class PDT_CheckBox(QtWidgets.QCheckBox):
         font = self.font()
         font.setPointSize(font_size)
         self.setFont(font)
+
+    def set_checked(self, checked: bool):
+        self.setChecked(checked)
 
 
 class PDT_PushButton(QtWidgets.QPushButton):
@@ -350,12 +356,82 @@ class AxesComboBoxWidget(QtWidgets.QWidget):
         self.yax_cb = PDT_ComboBox(width=100)
         af_plopts = ['alpha', 'CL', 'CD', 'CDp', 'CM', 'Top_Xtr', 'Bot_Xtr', 'CL/CD']
         self.yax_cb.addItems(['y-axis'] + af_plopts)
+        self.yax_cb.setCurrentText('CL')
         lay.addWidget(self.yax_cb)
         lay.addWidget(PDT_Label('versus'))
         self.xax_cb = PDT_ComboBox(width=100)
         self.xax_cb.addItems(['x-axis'] + af_plopts)
+        self.xax_cb.setCurrentText('CD')
         lay.addWidget(self.xax_cb)
         lay.addStretch()
+
+
+class ExistingFoilDataWidget(QtWidgets.QWidget):
+    def __init__(self, main_win: 'InterfaceMainWindow'):
+        super(ExistingFoilDataWidget, self).__init__()
+        self.main_win = main_win
+
+        lay = QtWidgets.QVBoxLayout()
+        self.setLayout(lay)
+
+        title_lbl = PDT_Label('Existing Data (plot controls)', font_size=14)
+        lay.addWidget(title_lbl)
+        btm_lay = QtWidgets.QHBoxLayout()
+        lay.addLayout(btm_lay)
+
+        # RE
+        re_grp = PDT_GroupBox('RE', font_size=11)
+        self.re_lay = QtWidgets.QGridLayout()
+        re_grp.setLayout(self.re_lay)
+        btm_lay.addWidget(re_grp)
+
+        # mach
+        mach_grp = PDT_GroupBox('Mach', font_size=11)
+        self.mach_lay = QtWidgets.QVBoxLayout()
+        mach_grp.setLayout(self.mach_lay)
+        btm_lay.addWidget(mach_grp)
+
+        # ncrit
+        ncrit_grp = PDT_GroupBox('Ncrit', font_size=11)
+        self.ncrit_lay = QtWidgets.QVBoxLayout()
+        ncrit_grp.setLayout(self.ncrit_lay)
+        btm_lay.addWidget(ncrit_grp)
+
+        # gets the all checkboxes in there
+        self.update_airfoil()
+
+    def update_airfoil(self, af: Airfoil = None):
+        delete_all_widgets_from_layout(layout=self.re_lay)
+        delete_all_widgets_from_layout(layout=self.mach_lay)
+        delete_all_widgets_from_layout(layout=self.ncrit_lay)
+
+        row = 0
+        added_rows = 0
+        if af is not None:
+            res, machs, ncrits = af.get_polar_data_grid()
+            added_rows = 1 + len(res) % 2
+            for i, re in enumerate(res):
+                chk = PDT_CheckBox('{:.1e}'.format(re), checked=True)
+                if i < int(len(res) / 2) + 1:
+                    row = i
+                    col = 0
+                else:
+                    row = i - int((len(res) / 2) + 1)
+                    col = 1
+                self.re_lay.addWidget(chk, row, col)
+            for mach in machs:
+                chk = PDT_CheckBox('{:.2f}'.format(mach), checked=True)
+                self.mach_lay.addWidget(chk)
+            for ncrit in ncrits:
+                chk = PDT_CheckBox('{}'.format(ncrit), checked=True)
+                self.ncrit_lay.addWidget(chk)
+
+        self.all_re_chk = PDT_CheckBox('(Un)check all', checked=True)
+        self.re_lay.addWidget(self.all_re_chk, row + added_rows, 0)
+        self.all_mach_chk = PDT_CheckBox('(Un)check all', checked=True)
+        self.mach_lay.addWidget(self.all_mach_chk)
+        self.all_ncrit_chk = PDT_CheckBox('(Un)check all', checked=True)
+        self.ncrit_lay.addWidget(self.all_ncrit_chk)
 
 
 class FoilDataPointWidget(QtWidgets.QWidget):
@@ -372,12 +448,12 @@ class FoilDataPointWidget(QtWidgets.QWidget):
         lay.addRow(PDT_Label('Re:', font_size=12), RangeLineEditWidget())
         lay.addRow(PDT_Label('Mach:', font_size=12), RangeLineEditWidget())
 
-        add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
-        clear_btn = PDT_PushButton('Clear Ranges', font_size=12, width=130)
+        self.add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
+        self.clear_btn = PDT_PushButton('Clear Ranges', font_size=12, width=130)
         btn_lay = QtWidgets.QHBoxLayout()
         btn_lay.addStretch()
-        btn_lay.addWidget(add_btn)
-        btn_lay.addWidget(clear_btn)
+        btn_lay.addWidget(self.add_btn)
+        btn_lay.addWidget(self.clear_btn)
         btn_lay.addStretch()
         lay.addRow(btn_lay)
         lay.setAlignment(btn_lay, QtCore.Qt.AlignRight)

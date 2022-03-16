@@ -913,5 +913,9 @@ def start_ui():
     w = InterfaceMainWindow()
     w.show()
     app.exec_()
-
     return
+
+
+def delete_all_widgets_from_layout(layout):
+    for i in reversed(range(layout.count())):
+        layout.itemAt(i).widget().setParent(None)

@@ -4,7 +4,7 @@ try:
     from PyQt5 import QtWidgets
     from propeller_design_tools.helper_ui_classes import PDT_TextEdit, Capturing, \
         PDT_GroupBox, PDT_Label, PDT_PushButton, PDT_ComboBox, DatabaseSelectionWidget, \
-        SingleAxCanvas, FoilDataPointWidget, AxesComboBoxWidget
+        SingleAxCanvas, FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget
 except:
     pass
 
@@ -52,7 +52,12 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
 
         # airfoil left
         af_left_lay.addStretch()
+        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
+        af_left_lay.addWidget(self.exist_data_widg)
+        af_left_lay.addStretch()
         add_foil_data_widg = FoilDataPointWidget(main_win=self)
+        add_foil_data_widg.add_btn.clicked.connect(self.add_foil_data_btn_clicked)
+        add_foil_data_widg.clear_btn.clicked.connect(self.clear_foil_ranges_btn_clicked)
         af_left_lay.addWidget(add_foil_data_widg)
         af_left_lay.addStretch()
 
@@ -75,7 +80,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.af_xax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
         af_right_top_lay.addRow(PDT_Label('Plot Metric:', font_size=14), ax_cb_widg)
 
-        self.foil_metric_canvas = SingleAxCanvas(self, width=7, height=4.5)
+        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=4.5)
         af_right_lay.addWidget(self.foil_metric_canvas)
 
         # propeller group
@@ -118,7 +123,14 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.console_te.append('\n'.join(output))
         self.foil_xy_canvas.draw()
 
-        self.af_metric_cb_changed()
+        self.af_metric_cb_changed()  # updates the metric plot
+        self.exist_data_widg.update_airfoil(af=self.foil)
+
+    def add_foil_data_btn_clicked(self):
+        print('here')
+
+    def clear_foil_ranges_btn_clicked(self):
+        print('here2')
 
 
 if __name__ == '__main__':

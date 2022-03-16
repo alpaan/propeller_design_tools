@@ -1,16 +1,16 @@
 import propeller_design_tools as pdt
 
 
-# af = pdt.Airfoil('e855.dat')
-# af.calculate_xfoil_polars(re=[1e6, 3e6, 5e6, 7e6, 1e7], ncrit=[9], mach=[0])
-# pdt.set_airfoil_database('C:/test1234')
-
 pdt.start_ui()
+
+# af = pdt.Airfoil('mrc-16.dat')
+# af.plot_geometry()
+# af.plot_polar_data(x_param='CD', y_param='CL')
+# af.calculate_xfoil_polars(re=[1e6, 3e6, 5e6, 7e6, 1e7], ncrit=[9], mach=[0])
 
 # prop = pdt.Propeller('MyPropeller')
 # prop.plot_geometry()
 # prop.plot_ideal_eff()
-
 
 # nblades: 3
 # radius: 0.5
