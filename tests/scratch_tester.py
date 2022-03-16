@@ -1,6 +1,8 @@
 import propeller_design_tools as pdt
 
 
+# af = pdt.Airfoil('e855.dat')
+# af.calculate_xfoil_polars(re=[1e6, 3e6, 5e6, 7e6, 1e7], ncrit=[9], mach=[0])
 # pdt.set_airfoil_database('C:/test1234')
 
 pdt.start_ui()

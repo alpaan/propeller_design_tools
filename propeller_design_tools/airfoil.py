@@ -62,9 +62,12 @@ class Airfoil(object):
                 f.write('{x:.7f} {y:.7f}\n'.format(x=coord[0], y=coord[1]))
         return savepath
 
-    def plot_geometry(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
+    def plot_geometry(self, fig=None):
+        if fig is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        else:
+            ax = fig.axes[0]
         ax.plot(self.x_coords, self.y_coords)
         ax.set_aspect('equal')
         ax.grid(True)
@@ -291,7 +294,7 @@ class Airfoil(object):
 
     def plot_polar_data(self, x_param: str, y_param: str, re_list: list = None, mach_list: list = None,
                         ncrit_list: list = None, xlims: tuple = None, ylims: tuple = None, rectified: bool = False,
-                        rect_kwargs: dict = {}, **plot_kwargs):
+                        rect_kwargs: dict = {}, fig=None, **plot_kwargs):
         """
         Method to plot existing polar data.
 
@@ -310,7 +313,6 @@ class Airfoil(object):
         :return fig: the pyplot.fig instance of the plot
         :return ax: the pyplot.axes instance of the plot
         """
-
         if x_param not in self.get_valid_xfoil_params() or y_param not in self.get_valid_xfoil_params():
             raise Error('"{}" is not a valid polar parameter combo for plotting'.
                           format('({}, {})'.format(x_param, y_param)))
@@ -343,8 +345,11 @@ class Airfoil(object):
         ncrit_list = list(sorted([int(n) for n in ncrit_list]))
 
         # create figure and axes instance
-        fig = plt.figure(figsize=(10, 8))
-        ax = fig.add_subplot(111)
+        if fig is None:
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111)
+        else:
+            ax = fig.axes[0]
 
         # plot em
         for re_key in re_list:

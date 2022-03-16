@@ -6,7 +6,7 @@ from io import StringIO
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 try:
-    from PyQt5 import QtWidgets
+    from PyQt5 import QtWidgets, QtCore
 except:
     pass
 
@@ -63,8 +63,42 @@ class PDT_Label(QtWidgets.QLabel):
         italic = kwargs.pop('italic') if 'italic' in kwargs else False
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+        width = kwargs.pop('width') if 'width' in kwargs else None
 
         super(PDT_Label, self).__init__(*args, **kwargs)
+
+        self.set_italic(italic=italic)
+        self.set_bold(bold=bold)
+        self.set_font_size(font_size=font_size)
+        self.set_width(width=width)
+
+    def set_italic(self, italic: bool):
+        font = self.font()
+        font.setItalic(italic)
+        self.setFont(font)
+
+    def set_bold(self, bold: bool):
+        font = self.font()
+        font.setBold(bold)
+        self.setFont(font)
+
+    def set_font_size(self, font_size: int):
+        font = self.font()
+        font.setPointSize(font_size)
+        self.setFont(font)
+
+    def set_width(self, width: int):
+        if width is not None:
+            self.setFixedWidth(width)
+
+
+class PDT_CheckBox(QtWidgets.QCheckBox):
+    def __init__(self, *args, **kwargs):
+        italic = kwargs.pop('italic') if 'italic' in kwargs else False
+        bold = kwargs.pop('bold') if 'bold' in kwargs else False
+        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+
+        super(PDT_CheckBox, self).__init__(*args, **kwargs)
 
         self.set_italic(italic=italic)
         self.set_bold(bold=bold)
@@ -94,6 +128,40 @@ class PDT_PushButton(QtWidgets.QPushButton):
         width = kwargs.pop('width') if 'width' in kwargs else None
 
         super(PDT_PushButton, self).__init__(*args, **kwargs)
+
+        self.set_italic(italic=italic)
+        self.set_bold(bold=bold)
+        self.set_font_size(font_size=font_size)
+        self.set_width(width=width)
+
+    def set_italic(self, italic: bool):
+        font = self.font()
+        font.setItalic(italic)
+        self.setFont(font)
+
+    def set_bold(self, bold: bool):
+        font = self.font()
+        font.setBold(bold)
+        self.setFont(font)
+
+    def set_font_size(self, font_size: int):
+        font = self.font()
+        font.setPointSize(font_size)
+        self.setFont(font)
+
+    def set_width(self, width: int):
+        if width is not None:
+            self.setFixedWidth(width)
+
+
+class PDT_LineEdit(QtWidgets.QLineEdit):
+    def __init__(self, *args, **kwargs):
+        italic = kwargs.pop('italic') if 'italic' in kwargs else False
+        bold = kwargs.pop('bold') if 'bold' in kwargs else False
+        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+        width = kwargs.pop('width') if 'width' in kwargs else None
+
+        super(PDT_LineEdit, self).__init__(*args, **kwargs)
 
         self.set_italic(italic=italic)
         self.set_bold(bold=bold)
@@ -257,3 +325,60 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         direc = QtWidgets.QFileDialog.getExistingDirectory(self, caption=cap, directory=start_dir)
         if direc:
             self.set_current_db(db_dir=direc)
+
+
+class RangeLineEditWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(RangeLineEditWidget, self).__init__()
+        lay = QtWidgets.QHBoxLayout()
+        self.setLayout(lay)
+        self.left_le = PDT_LineEdit('', font_size=12, width=100)
+        self.right_le = PDT_LineEdit('', font_size=12, width=100)
+
+        lay.addWidget(self.left_le)
+        lay.addWidget(PDT_Label('->', font_size=12))
+        lay.addWidget(self.right_le)
+        lay.addStretch()
+
+
+class AxesComboBoxWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(AxesComboBoxWidget, self).__init__()
+        lay = QtWidgets.QHBoxLayout()
+        self.setLayout(lay)
+
+        self.yax_cb = PDT_ComboBox(width=100)
+        af_plopts = ['alpha', 'CL', 'CD', 'CDp', 'CM', 'Top_Xtr', 'Bot_Xtr', 'CL/CD']
+        self.yax_cb.addItems(['y-axis'] + af_plopts)
+        lay.addWidget(self.yax_cb)
+        lay.addWidget(PDT_Label('versus'))
+        self.xax_cb = PDT_ComboBox(width=100)
+        self.xax_cb.addItems(['x-axis'] + af_plopts)
+        lay.addWidget(self.xax_cb)
+        lay.addStretch()
+
+
+class FoilDataPointWidget(QtWidgets.QWidget):
+    def __init__(self, main_win: 'InterfaceMainWindow'):
+        super(FoilDataPointWidget, self).__init__()
+        self.main_win = main_win
+
+        lay = QtWidgets.QFormLayout()
+        self.setLayout(lay)
+
+        overwrite_chk = PDT_CheckBox('Overwrite Existing Data?', font_size=11)
+        lay.addRow(PDT_Label('Add Datapoint Range:', font_size=14), overwrite_chk)
+        lay.addRow(PDT_Label('Ncrit:', font_size=12), RangeLineEditWidget())
+        lay.addRow(PDT_Label('Re:', font_size=12), RangeLineEditWidget())
+        lay.addRow(PDT_Label('Mach:', font_size=12), RangeLineEditWidget())
+
+        add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
+        clear_btn = PDT_PushButton('Clear Ranges', font_size=12, width=130)
+        btn_lay = QtWidgets.QHBoxLayout()
+        btn_lay.addStretch()
+        btn_lay.addWidget(add_btn)
+        btn_lay.addWidget(clear_btn)
+        btn_lay.addStretch()
+        lay.addRow(btn_lay)
+        lay.setAlignment(btn_lay, QtCore.Qt.AlignRight)
+        lay.setLabelAlignment(QtCore.Qt.AlignRight)
