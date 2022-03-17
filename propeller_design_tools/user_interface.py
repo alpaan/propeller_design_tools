@@ -1,20 +1,27 @@
-from propeller_design_tools.funcs import get_all_airfoil_files, get_all_propeller_dirs
+import numpy as np
+import os
 from propeller_design_tools.airfoil import Airfoil
+from propeller_design_tools.user_settings import _get_cursor_fpath
 try:
-    from PyQt5 import QtWidgets
-    from propeller_design_tools.helper_ui_classes import PDT_TextEdit, Capturing, \
-        PDT_GroupBox, PDT_Label, PDT_PushButton, PDT_ComboBox, DatabaseSelectionWidget, \
-        SingleAxCanvas, FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget
+    from PyQt5 import QtWidgets, QtGui
+    from propeller_design_tools.helper_ui_classes import Capturing, DatabaseSelectionWidget, SingleAxCanvas, \
+        FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget, PdtGuiPrinter, FoilAnalysisWidget, PropellerWidget
+    from propeller_design_tools.helper_ui_subclasses import PDT_TextEdit, PDT_GroupBox, PDT_Label, PDT_PushButton, \
+        PDT_ComboBox, PDT_TabWidget
 except:
     pass
 
 
 class InterfaceMainWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, foil: Airfoil = None):
         super(InterfaceMainWindow, self).__init__()
         self.setWindowTitle('PDT Control Dashboard')
-        self.setMinimumSize(1400, 800)
-        self.foil = None
+        self.setMinimumSize(1600, 900)
+        self.foil = foil
+
+        cursor_fpath = _get_cursor_fpath()
+        cursor = QtGui.QCursor(QtGui.QPixmap(cursor_fpath))
+        self.setCursor(cursor)
 
         # central widget
         center_widg = QtWidgets.QWidget()
@@ -23,14 +30,20 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(center_widg)
 
         # the main groups
+        top_lay = QtWidgets.QHBoxLayout()
         sett_grp = PDT_GroupBox('Settings'.upper(), italic=True, font_size=16)
-        center_lay.addWidget(sett_grp)
-        af_grp = PDT_GroupBox('Airfoil Analysis'.upper(), italic=True, font_size=16)
-        center_lay.addWidget(af_grp)
-        prop_grp = PDT_GroupBox('Propellers'.upper(), italic=True, font_size=16)
-        center_lay.addWidget(prop_grp)
+        top_lay.addWidget(sett_grp)
         console_grp = PDT_GroupBox('Console Output'.upper(), italic=True, font_size=16)
-        center_lay.addWidget(console_grp)
+        top_lay.addWidget(console_grp)
+        center_lay.addLayout(top_lay)
+
+        # tab widget
+        tab_widg = PDT_TabWidget(font_size=16, italic=True)
+        center_lay.addWidget(tab_widg)
+        self.af_widg = FoilAnalysisWidget()
+        tab_widg.addTab(self.af_widg, 'Airfoil Analysis')
+        prop_widg = PropellerWidget()
+        tab_widg.addTab(prop_widg, 'Propellers')
 
         # settings group
         sett_lay = QtWidgets.QFormLayout()
@@ -39,53 +52,6 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         sett_lay.addRow(PDT_Label('Airfoil Database:', font_size=14), af_db_select_widg)
         prop_db_select_widg = DatabaseSelectionWidget(main_win=self, db_type='propeller')
         sett_lay.addRow(PDT_Label('Propeller Database:', font_size=14), prop_db_select_widg)
-
-        # airfoil group
-        af_lay = QtWidgets.QHBoxLayout()
-        af_grp.setLayout(af_lay)
-        af_left_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_left_lay)
-        af_center_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_center_lay)
-        af_right_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_right_lay)
-
-        # airfoil left
-        af_left_lay.addStretch()
-        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
-        af_left_lay.addWidget(self.exist_data_widg)
-        af_left_lay.addStretch()
-        add_foil_data_widg = FoilDataPointWidget(main_win=self)
-        add_foil_data_widg.add_btn.clicked.connect(self.add_foil_data_btn_clicked)
-        add_foil_data_widg.clear_btn.clicked.connect(self.clear_foil_ranges_btn_clicked)
-        af_left_lay.addWidget(add_foil_data_widg)
-        af_left_lay.addStretch()
-
-        # airfoil center
-        af_center_top_lay = QtWidgets.QFormLayout()
-        af_center_lay.addLayout(af_center_top_lay)
-        select_foil_cb = PDT_ComboBox(width=150)
-        select_foil_cb.addItems(['None'] + get_all_airfoil_files())
-        select_foil_cb.currentTextChanged.connect(self.select_foil_cb_changed)
-        af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14), select_foil_cb)
-        self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
-        af_center_lay.addWidget(self.foil_xy_canvas)
-
-        #airfoil right
-        af_right_top_lay = QtWidgets.QFormLayout()
-        af_right_lay.addLayout(af_right_top_lay)
-        ax_cb_widg = AxesComboBoxWidget()
-        self.af_yax_cb, self.af_xax_cb = ax_cb_widg.yax_cb, ax_cb_widg.xax_cb
-        self.af_yax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
-        self.af_xax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
-        af_right_top_lay.addRow(PDT_Label('Plot Metric:', font_size=14), ax_cb_widg)
-
-        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=4.5)
-        af_right_lay.addWidget(self.foil_metric_canvas)
-
-        # propeller group
-        prop_lay = QtWidgets.QHBoxLayout()
-        prop_grp.setLayout(prop_lay)
 
         # console group
         console_lay = QtWidgets.QVBoxLayout()
@@ -99,38 +65,105 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         # call these last because they rely on self.console_te existing
         af_db_select_widg.set_current_db()
         prop_db_select_widg.set_current_db()
+        self.printer = PdtGuiPrinter(console_te=self.console_te)
+
+        # connecting signals
+        self.af_widg.add_foil_data_widg.add_btn.clicked.connect(self.add_foil_data_btn_clicked)
+        self.af_widg.add_foil_data_widg.reset_btn.clicked.connect(self.reset_foil_ranges_btn_clicked)
+        self.af_widg.select_foil_cb.currentTextChanged.connect(self.select_foil_cb_changed)
+        self.af_widg.af_yax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
+        self.af_widg.af_xax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
 
     def af_metric_cb_changed(self):
-        self.foil_metric_canvas.axes.clear()
-        y_txt, x_txt = self.af_yax_cb.currentText(), self.af_xax_cb.currentText()
+        self.af_widg.foil_metric_canvas.axes.clear()
+        self.af_widg.foil_metric_canvas.draw()
+        y_txt, x_txt = self.af_widg.af_yax_cb.currentText(), self.af_widg.af_xax_cb.currentText()
         if y_txt == 'y-axis' or x_txt == 'x-axis':
             return
 
         if self.foil is not None:
+            if len(self.foil.polar_data) == 0:
+                self.print('No data for current foil')
+                return
+
             with Capturing() as output:
-                self.foil.plot_polar_data(x_param=x_txt, y_param=y_txt, fig=self.foil_metric_canvas.figure)
-            self.console_te.append('\n'.join(output))
-            self.foil_metric_canvas.draw()
+                self.foil.plot_polar_data(x_param=x_txt, y_param=y_txt, fig=self.af_widg.foil_metric_canvas.figure)
+            self.console_te.append('\n'.join(output) if len(output) > 0 else '')
+
+            self.af_widg.foil_metric_canvas.draw()
 
     def clear_console_btn_clicked(self):
         self.console_te.clear()
 
     def select_foil_cb_changed(self, foil_txt):
-        self.foil_xy_canvas.axes.clear()
-        with Capturing() as output:
-            self.foil = Airfoil(name=foil_txt, exact_namematch=True)
-            self.foil.plot_geometry(fig=self.foil_xy_canvas.figure)
-        self.console_te.append('\n'.join(output))
-        self.foil_xy_canvas.draw()
+        self.print('Changing Current Foil...')
+        self.af_widg.foil_xy_canvas.axes.clear()
+        if not foil_txt == 'None':
+            try:
 
-        self.af_metric_cb_changed()  # updates the metric plot
-        self.exist_data_widg.update_airfoil(af=self.foil)
+                with Capturing() as output:
+                    self.foil = Airfoil(name=foil_txt, exact_namematch=True)
+                self.console_te.append('\n'.join(output))
+
+            except Exception as e:
+                with Capturing() as output:
+                    self.print(e)
+                self.console_te.append('\n'.join(output))
+                self.foil = None
+        else:
+            self.foil = None
+
+        if self.foil is not None:
+            self.foil.plot_geometry(fig=self.af_widg.foil_xy_canvas.figure)
+            self.af_metric_cb_changed()  # updates the metric plot
+        else:
+            self.af_widg.foil_xy_canvas.axes.clear()
+            self.af_widg.foil_metric_canvas.axes.clear()
+        self.af_widg.foil_xy_canvas.draw()
+        self.af_widg.foil_metric_canvas.draw()
+        self.af_widg.exist_data_widg.update_airfoil(af=self.foil)
 
     def add_foil_data_btn_clicked(self):
-        print('here')
+        if self.foil is None:
+            self.print('Must select a foil first!')
+            return
 
-    def clear_foil_ranges_btn_clicked(self):
-        print('here2')
+        re_min = int(float(self.af_widg.add_foil_data_widg.re_rle.left_box.text()))
+        re_step = int(float(self.af_widg.add_foil_data_widg.re_rle.step_box.text()))
+        re_max = int(float(self.af_widg.add_foil_data_widg.re_rle.right_box.text())) + re_step
+
+        mach_min = float(self.af_widg.add_foil_data_widg.mach_rle.left_box.text())
+        mach_step = float(self.af_widg.add_foil_data_widg.mach_rle.step_box.text())
+        mach_max = float(self.af_widg.add_foil_data_widg.mach_rle.right_box.text()) + mach_step
+
+        ncrit_min = int(self.af_widg.add_foil_data_widg.ncrit_rle.left_box.text())
+        ncrit_step = int(self.af_widg.add_foil_data_widg.ncrit_rle.step_box.text())
+        ncrit_max = int(self.af_widg.add_foil_data_widg.ncrit_rle.right_box.text()) + ncrit_step
+
+        res = np.arange(re_min, re_max, re_step)
+        machs = np.arange(mach_min, mach_max, mach_step)
+        ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
+
+        for re in res:
+            for mach in machs:
+                for ncrit in ncrits:
+                    self.print('Calculating...(Re={}, mach={}, ncrit={})'.format(re, mach, ncrit))
+                    QtWidgets.QApplication.processEvents()
+
+                    with Capturing() as output:
+                        self.foil.calculate_xfoil_polars(re=[re], mach=[mach], ncrit=[ncrit])
+                    self.console_te.append('\n'.join(output))
+
+                    with Capturing() as output:
+                        self.foil.load_polar_data()
+                    self.console_te.append('\n'.join(output))
+                    self.select_foil_cb_changed(foil_txt=self.af_widg.select_foil_cb.currentText())  # updates everything
+
+    def reset_foil_ranges_btn_clicked(self):
+        self.af_widg.add_foil_data_widg.reset_ranges()
+
+    def print(self, s: str):
+        self.printer.print(s)
 
 
 if __name__ == '__main__':

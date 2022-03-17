@@ -1,7 +1,7 @@
 import os
 import warnings
 from propeller_design_tools import funcs
-from propeller_design_tools.user_io import Error, Info
+from propeller_design_tools.user_io import Error, Info, Warning
 from propeller_design_tools.user_settings import _get_user_settings
 import matplotlib
 matplotlib.use('TKAgg')
@@ -150,13 +150,14 @@ class Airfoil(object):
             if len(aa) > 0:     # made it to a_max, but converged at least once
                 return aa[-1] + 2
             else:   # made it all the way to max_a without converging
-                trace_txt = 'Airfoil.alpha_auto_range.find_stall_angle()'
-                err_txt = 'Unable to find stall angle, max_a reached (foil={}, re={:.0f})'.format(self.name, re)
-
-                info_d = {'func/method': trace_txt, 'Error Text': err_txt, 'dclda_threshold':
-                    dclda_threshold, 'start_a': start_a, 'ainc': ainc, 'max_a': max_a}
-                errplot_kwargs = {'x': aa, 'y': cl, 'xlbl': 'alpha (deg)', 'ylbl': 'CL', 'info_d': info_d}
-                raise Error(err_txt, **errplot_kwargs)
+                # trace_txt = 'Airfoil.alpha_auto_range.find_stall_angle()'
+                # err_txt = 'Unable to find stall angle, max_a reached (foil={}, re={:.0f})'.format(self.name, re)
+                #
+                # info_d = {'func/method': trace_txt, 'Error Text': err_txt, 'dclda_threshold':
+                #     dclda_threshold, 'start_a': start_a, 'ainc': ainc, 'max_a': max_a}
+                # errplot_kwargs = {'x': aa, 'y': cl, 'xlbl': 'alpha (deg)', 'ylbl': 'CL', 'info_d': info_d}
+                # raise Error(err_txt, **errplot_kwargs)
+                return max_a
 
         # use the functions above
         zero_lift_aoa = find_alpha_CL0()
@@ -198,7 +199,7 @@ class Airfoil(object):
         if 're' in kwargs:
             re_list = kwargs.pop('re')
             if not isinstance(re_list, list):
-                re_list = [re_list]
+                re_list = list(re_list)
         else:
             raise Error('Must input a value for KWARG "re"')
 
@@ -206,14 +207,14 @@ class Airfoil(object):
             alpha_list = kwargs.pop('alpha')
             if not isinstance(alpha_list, list):
                 if alpha_list is not None:
-                    alpha_list = [alpha_list]
+                    alpha_list = list(alpha_list)
         else:
             alpha_list = None  # default -> alpha_list=None will trigger alpha-auto range
 
         if 'ncrit' in kwargs:
             ncrit_list = kwargs.pop('ncrit')
             if not isinstance(ncrit_list, list):
-                ncrit_list = [ncrit_list]
+                ncrit_list = list(ncrit_list)
         else:
             ncrit_list = [9]  # default
         for nc in ncrit_list:        # check ncrit in range
@@ -223,7 +224,7 @@ class Airfoil(object):
         if 'mach' in kwargs:
             mach_list = kwargs.pop('mach')
             if not isinstance(mach_list, list):
-                mach_list = [mach_list]
+                mach_list = list(mach_list)
         else:
             mach_list = [0.0]  # default
 
@@ -371,8 +372,8 @@ class Airfoil(object):
                         d = pol_data[(re_key, mach_key, ncrit_key)]
                         ax.plot(d[x_param], d[y_param], label='{:.1e}, {}, {}'.format(re_key, mach_key, ncrit_key), **plot_kwargs)
                     else:
-                        print('Warning: Cannot find polar for {} @ Re = {}, Mach = {}, Ncrit = {}, skipping this one...'
-                              .format(self.name, re_key, mach_key, ncrit_key))
+                        Warning('Cannot find polar for {} @ Re = {}, Mach = {}, Ncrit = {}, skipping this one...'
+                                .format(self.name, re_key, mach_key, ncrit_key))
 
         ax.grid(True)
         ax.set_title('{}\nrectified={}'.format(self.filename, rectified))

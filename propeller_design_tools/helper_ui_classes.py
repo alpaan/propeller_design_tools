@@ -1,13 +1,17 @@
 import os
 from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
-from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db, delete_all_widgets_from_layout
+from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db, delete_all_widgets_from_layout, \
+    get_all_airfoil_files, get_all_propeller_dirs
 from propeller_design_tools.airfoil import Airfoil
 import sys
+from typing import Union
 from io import StringIO
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 try:
     from PyQt5 import QtWidgets, QtCore
+    from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_PushButton, PDT_SpinBox, PDT_DoubleSpinBox, \
+        PDT_ComboBox, PDT_GroupBox, PDT_CheckBox, PDT_TextEdit, PDT_LineEdit, PDT_ScienceSpinBox
 except:
     pass
 
@@ -31,246 +35,12 @@ class Capturing(list):
         sys.stdout = self._stdout
 
 
-class PDT_GroupBox(QtWidgets.QGroupBox):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+class PdtGuiPrinter:
+    def __init__(self, console_te: PDT_TextEdit):
+        self.console_te = console_te
 
-        super(PDT_GroupBox, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-
-class PDT_Label(QtWidgets.QLabel):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        width = kwargs.pop('width') if 'width' in kwargs else None
-
-        super(PDT_Label, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_width(width=width)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_width(self, width: int):
-        if width is not None:
-            self.setFixedWidth(width)
-
-
-class PDT_CheckBox(QtWidgets.QCheckBox):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        checked = kwargs.pop('checked') if 'checked' in kwargs else False
-
-        super(PDT_CheckBox, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_checked(checked=checked)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_checked(self, checked: bool):
-        self.setChecked(checked)
-
-
-class PDT_PushButton(QtWidgets.QPushButton):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        width = kwargs.pop('width') if 'width' in kwargs else None
-
-        super(PDT_PushButton, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_width(width=width)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_width(self, width: int):
-        if width is not None:
-            self.setFixedWidth(width)
-
-
-class PDT_LineEdit(QtWidgets.QLineEdit):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        width = kwargs.pop('width') if 'width' in kwargs else None
-
-        super(PDT_LineEdit, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_width(width=width)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_width(self, width: int):
-        if width is not None:
-            self.setFixedWidth(width)
-
-
-class PDT_ComboBox(QtWidgets.QComboBox):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        width = kwargs.pop('width') if 'width' in kwargs else None
-
-        super(PDT_ComboBox, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_width(width=width)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_width(self, width: int):
-        if width is not None:
-            self.setFixedWidth(width)
-
-
-class PDT_TextEdit(QtWidgets.QTextEdit):
-    def __init__(self, *args, **kwargs):
-        italic = kwargs.pop('italic') if 'italic' in kwargs else False
-        bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
-        width = kwargs.pop('width') if 'width' in kwargs else None
-        height = kwargs.pop('height') if 'height' in kwargs else None
-        read_only = kwargs.pop('read_only') if 'read_only' in kwargs else True
-
-        super(PDT_TextEdit, self).__init__(*args, **kwargs)
-
-        self.set_italic(italic=italic)
-        self.set_bold(bold=bold)
-        self.set_font_size(font_size=font_size)
-        self.set_width(width=width)
-        self.set_height(height=height)
-        self.set_read_only(read_only=read_only)
-
-    def set_italic(self, italic: bool):
-        font = self.font()
-        font.setItalic(italic)
-        self.setFont(font)
-
-    def set_bold(self, bold: bool):
-        font = self.font()
-        font.setBold(bold)
-        self.setFont(font)
-
-    def set_font_size(self, font_size: int):
-        font = self.font()
-        font.setPointSize(font_size)
-        self.setFont(font)
-
-    def set_width(self, width: int):
-        if width is not None:
-            self.setFixedWidth(width)
-
-    def set_height(self, height: int):
-        if height is not None:
-            self.setFixedHeight(height)
-
-    def set_read_only(self, read_only: bool):
-        self.setReadOnly(read_only)
+    def print(self, s: str):
+        self.console_te.append('PDT GUI:  {}'.format(s))
 
 
 class DatabaseSelectionWidget(QtWidgets.QWidget):
@@ -334,16 +104,49 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
 
 
 class RangeLineEditWidget(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self, box_range: Union[tuple, list], box_single_step: Union[int, float] = None,
+                 default_strs: list = ('', '', ''), spin_double_science: str = 'spin'):
+        self.box_range = box_range
+        self.box_single_step = box_single_step
+        self.default_strs = default_strs
+
         super(RangeLineEditWidget, self).__init__()
         lay = QtWidgets.QHBoxLayout()
         self.setLayout(lay)
-        self.left_le = PDT_LineEdit('', font_size=12, width=100)
-        self.right_le = PDT_LineEdit('', font_size=12, width=100)
 
-        lay.addWidget(self.left_le)
+        left_default, right_default, step_default = self.default_strs
+        if spin_double_science == 'double':
+            self.left_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=self.box_range,
+                                              box_single_step=self.box_single_step, special_str=left_default)
+            self.right_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=self.box_range,
+                                               box_single_step=self.box_single_step, special_str=right_default)
+        elif spin_double_science == 'spin':
+            self.left_box = PDT_SpinBox(font_size=12, width=80, box_range=self.box_range,
+                                        box_single_step=self.box_single_step, special_str=left_default)
+            self.right_box = PDT_SpinBox(font_size=12, width=80, box_range=self.box_range,
+                                         box_single_step=self.box_single_step, special_str=right_default)
+        else:  # spin_double_science == 'science'
+            self.left_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=left_default, box_range=self.box_range)
+            self.right_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=right_default, box_range=self.box_range)
+
+        lay.addWidget(self.left_box)
         lay.addWidget(PDT_Label('->', font_size=12))
-        lay.addWidget(self.right_le)
+        lay.addWidget(self.right_box)
+        lay.addWidget(PDT_Label('by'))
+
+        if spin_double_science == 'double':
+            self.step_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=[0, 10],
+                                              box_single_step=0.01, special_str=step_default)
+        elif spin_double_science == 'spin':
+            self.step_box = PDT_SpinBox(font_size=12, width=80, box_range=[1, 1e8],
+                                        box_single_step=1, special_str=step_default)
+        else:  # spin_double_science == 'science'
+            self.step_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=step_default, box_range=[1e3, 1e9])
+
+        lay.addWidget(self.step_box)    # but was the step box really even stuck?
+        lay.addWidget(PDT_Label('=', font_size=12))
+        self.equals_le = PDT_LineEdit('[]', font_size=12, italic=True, width=110)
+        lay.addWidget(self.equals_le)
         lay.addStretch()
 
 
@@ -405,19 +208,18 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
         delete_all_widgets_from_layout(layout=self.mach_lay)
         delete_all_widgets_from_layout(layout=self.ncrit_lay)
 
-        row = 0
-        added_rows = 0
+        row = -1
         if af is not None:
             res, machs, ncrits = af.get_polar_data_grid()
-            added_rows = 1 + len(res) % 2
             for i, re in enumerate(res):
                 chk = PDT_CheckBox('{:.1e}'.format(re), checked=True)
-                if i < int(len(res) / 2) + 1:
+                if i < len(res) / 2:
                     row = i
                     col = 0
                 else:
-                    row = i - int((len(res) / 2) + 1)
+                    row = i - int(len(res) / 2)
                     col = 1
+                self.re_lay.addWidget(chk, i, 0)
                 self.re_lay.addWidget(chk, row, col)
             for mach in machs:
                 chk = PDT_CheckBox('{:.2f}'.format(mach), checked=True)
@@ -427,7 +229,7 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
                 self.ncrit_lay.addWidget(chk)
 
         self.all_re_chk = PDT_CheckBox('(Un)check all', checked=True)
-        self.re_lay.addWidget(self.all_re_chk, row + added_rows, 0)
+        self.re_lay.addWidget(self.all_re_chk, row + 1, 0)
         self.all_mach_chk = PDT_CheckBox('(Un)check all', checked=True)
         self.mach_lay.addWidget(self.all_mach_chk)
         self.all_ncrit_chk = PDT_CheckBox('(Un)check all', checked=True)
@@ -443,18 +245,83 @@ class FoilDataPointWidget(QtWidgets.QWidget):
         self.setLayout(lay)
 
         overwrite_chk = PDT_CheckBox('Overwrite Existing Data?', font_size=11)
-        lay.addRow(PDT_Label('Add Datapoint Range:', font_size=14), overwrite_chk)
-        lay.addRow(PDT_Label('Ncrit:', font_size=12), RangeLineEditWidget())
-        lay.addRow(PDT_Label('Re:', font_size=12), RangeLineEditWidget())
-        lay.addRow(PDT_Label('Mach:', font_size=12), RangeLineEditWidget())
+        lay.addRow(PDT_Label('Add\nDatapoints\nBy Range:', font_size=14), overwrite_chk)
+        lay.setAlignment(overwrite_chk, QtCore.Qt.AlignBottom)
+        self.re_rle = RangeLineEditWidget(box_range=[1e4, 1e9], default_strs=['1e6', '1e7', '3e6'],
+                                          spin_double_science='science')
+        self.mach_rle = RangeLineEditWidget(box_range=[0, 10], box_single_step=0.05,
+                                            default_strs=['0.00', '0.00', '0.10'], spin_double_science='double')
+        self.ncrit_rle = RangeLineEditWidget(box_range=[4, 14], box_single_step=1, default_strs=['9', '9', '1'],
+                                             spin_double_science='spin')
+        lay.addRow(PDT_Label('Re:', font_size=12), self.re_rle)
+        lay.addRow(PDT_Label('Mach:', font_size=12), self.mach_rle)
+        lay.addRow(PDT_Label('Ncrit:', font_size=12), self.ncrit_rle)
 
         self.add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
-        self.clear_btn = PDT_PushButton('Clear Ranges', font_size=12, width=130)
+        self.reset_btn = PDT_PushButton('Reset Ranges', font_size=12, width=130)
         btn_lay = QtWidgets.QHBoxLayout()
         btn_lay.addStretch()
         btn_lay.addWidget(self.add_btn)
-        btn_lay.addWidget(self.clear_btn)
+        btn_lay.addWidget(self.reset_btn)
         btn_lay.addStretch()
         lay.addRow(btn_lay)
         lay.setAlignment(btn_lay, QtCore.Qt.AlignRight)
         lay.setLabelAlignment(QtCore.Qt.AlignRight)
+
+    def reset_ranges(self):
+        self.re_rle.left_box.setValue(0)
+        self.re_rle.right_box.setValue(0)
+        self.re_rle.step_box.setValue(0)
+        self.mach_rle.left_box.setValue(0)
+        self.mach_rle.right_box.setValue(0)
+        self.mach_rle.step_box.setValue(0)
+        self.ncrit_rle.left_box.setValue(0)
+        self.ncrit_rle.right_box.setValue(0)
+        self.ncrit_rle.step_box.setValue(0)
+
+
+class FoilAnalysisWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(FoilAnalysisWidget, self).__init__()
+
+        # airfoil group
+        af_lay = QtWidgets.QHBoxLayout()
+        self.setLayout(af_lay)
+        af_left_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_left_lay)
+        af_center_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_center_lay)
+        af_right_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_right_lay)
+
+        # airfoil left
+        af_left_lay.addStretch()
+        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
+        af_left_lay.addWidget(self.exist_data_widg)
+        af_left_lay.addStretch()
+        self.add_foil_data_widg = FoilDataPointWidget(main_win=self)
+        af_left_lay.addWidget(self.add_foil_data_widg)
+        af_left_lay.addStretch()
+
+        # airfoil center
+        af_center_top_lay = QtWidgets.QFormLayout()
+        af_center_lay.addLayout(af_center_top_lay)
+        self.select_foil_cb = PDT_ComboBox(width=150)
+        self.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
+        af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14), self.select_foil_cb)
+        self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
+        af_center_lay.addWidget(self.foil_xy_canvas)
+
+        # airfoil right
+        af_right_top_lay = QtWidgets.QFormLayout()
+        af_right_lay.addLayout(af_right_top_lay)
+        ax_cb_widg = AxesComboBoxWidget()
+        self.af_yax_cb, self.af_xax_cb = ax_cb_widg.yax_cb, ax_cb_widg.xax_cb
+        af_right_top_lay.addRow(PDT_Label('Plot Metric:', font_size=14), ax_cb_widg)
+        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=4.5)
+        af_right_lay.addWidget(self.foil_metric_canvas)
+
+
+class PropellerWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(PropellerWidget, self).__init__()

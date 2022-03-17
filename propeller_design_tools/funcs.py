@@ -80,7 +80,7 @@ def get_all_airfoil_files():
     for fname in os.listdir(af_db):
         if os.path.splitext(fname)[1] in ['.dat', '.txt']:
             fnames.append(fname)
-    return fnames
+    return [name for name in fnames if name not in ['polar_output.txt', 'xfoil_inputs_temp.txt']]
 
 
 def get_all_propeller_dirs():
@@ -158,6 +158,9 @@ def get_airfoil_file_from_db(foil_name: str, exact_namematch: bool = False):
 
 
 def merge_polar_data_dicts(new: dict, old: dict):
+    if len(old) == 0:  # there was no old data
+        return new
+
     new_pol_keys = new[list(new.keys())[0]].keys()
     merged = new.copy()  # merged starts out as copy of the new dict
     for old_pol_key, old_pol in old.items():  # cylce thru old dict
@@ -292,8 +295,8 @@ def read_airfoil_coordinate_file(fpath: str, verbose: bool = True):
     return name, np.array(x_coords), np.array(y_coords)
 
 
-def run_xfoil(foil_relpath: str, re: float, alpha: list = None, cl: list = None, iter_limit: int = 40, ncrit: int = 9,
-              mach: float = 0.0, output_fpath: str = None, keypress_iternum: int = 1, tmout: int = 12,
+def run_xfoil(foil_relpath: str, re: float, alpha: list = None, cl: list = None, iter_limit: int = 30, ncrit: int = 9,
+              mach: float = 0.0, output_fpath: str = None, keypress_iternum: int = 1, tmout: int = 25,
               hide_windows: bool = True, verbose: bool = False):
     if not output_fpath:
         output_fpath = 'polar_output.txt'

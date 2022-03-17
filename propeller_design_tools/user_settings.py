@@ -51,6 +51,14 @@ def _get_pdt_pkg_dir():
     return os.path.join(_get_env_dir(), 'Lib', 'site-packages', 'propeller_design_tools')
 
 
+def _get_cursor_fpath():
+    pkg_dir = _get_pdt_pkg_dir()
+    if os.path.isdir(pkg_dir):
+        return os.path.join(pkg_dir, 'crosshair_cursor.png')
+    else:
+        return os.path.join(os.path.split(_get_env_dir())[0], 'crosshair_cursor.png')
+
+
 def _get_settings_fpath():
     pkg_dir = _get_pdt_pkg_dir()
     if os.path.isdir(pkg_dir):
