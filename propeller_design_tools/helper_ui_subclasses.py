@@ -1,5 +1,9 @@
-from PyQt5 import QtWidgets
-from propeller_design_tools.science_spinbox_class import ScientificDoubleSpinBox
+try:
+    from PyQt5 import QtWidgets, QtGui, QtCore
+    from propeller_design_tools.user_settings import _get_cursor_fpath
+    from propeller_design_tools.science_spinbox_class import ScientificDoubleSpinBox
+except:
+    pass
 
 
 class PDT_GroupBox(QtWidgets.QGroupBox):
@@ -137,6 +141,7 @@ class PDT_LineEdit(QtWidgets.QLineEdit):
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
+        read_only = kwargs.pop('read_only') if 'read_only' in kwargs else False
 
         super(PDT_LineEdit, self).__init__(*args, **kwargs)
 
@@ -144,6 +149,7 @@ class PDT_LineEdit(QtWidgets.QLineEdit):
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
         self.set_width(width=width)
+        self.setReadOnly(read_only)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -169,7 +175,7 @@ class PDT_ComboBox(QtWidgets.QComboBox):
     def __init__(self, *args, **kwargs):
         italic = kwargs.pop('italic') if 'italic' in kwargs else False
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
-        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+        font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 12
         width = kwargs.pop('width') if 'width' in kwargs else None
 
         super(PDT_ComboBox, self).__init__(*args, **kwargs)
@@ -178,6 +184,8 @@ class PDT_ComboBox(QtWidgets.QComboBox):
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
         self.set_width(width=width)
+
+        self.view().setCursor(QtGui.QCursor(QtGui.QPixmap(_get_cursor_fpath())))
 
     def set_italic(self, italic: bool):
         font = self.font()

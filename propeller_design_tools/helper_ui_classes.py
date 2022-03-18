@@ -1,9 +1,7 @@
 import os
 import numpy as np
 from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
-from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db, delete_all_widgets_from_layout, \
-    get_all_airfoil_files, get_all_propeller_dirs
-from propeller_design_tools.airfoil import Airfoil
+from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db
 import sys
 from typing import Union
 from io import StringIO
@@ -18,9 +16,18 @@ except:
 
 
 class SingleAxCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=5, height=4, dpi=100):
+    def __init__(self, *args, **kwargs):
+        width = kwargs.pop('width') if 'width' in kwargs else 5
+        height = kwargs.pop('height') if 'height' in kwargs else 4
+        dpi = kwargs.pop('dpi') if 'dpi' in kwargs else 100
+        projection = kwargs.pop('projection') if 'projection' in kwargs else None
+
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
+        if projection is None:
+            self.axes = fig.add_subplot(111)
+        else:
+            self.axes = fig.add_subplot(111, projection='3d')
+
         super(SingleAxCanvas, self).__init__(fig)
 
 
@@ -45,6 +52,9 @@ class PdtGuiPrinter:
 
 
 class DatabaseSelectionWidget(QtWidgets.QWidget):
+
+    currentDatabaseChanged = QtCore.pyqtSignal(str)
+
     def __init__(self, main_win: 'InterfaceMainWindow', db_type: str, db_dir: str = None):
         super(DatabaseSelectionWidget, self).__init__()
         self.main_win = main_win
@@ -84,17 +94,27 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         if db_dir is None:
             db_dir = self.get_existing_setting()
 
+        old_db = self.current_db_lbl.text()
+        if db_dir == old_db:
+            return
+
         self.current_db_lbl.setText(db_dir)
         self.db_dir = db_dir
 
-        with Capturing() as output:
-            if self.db_type == 'airfoil':
-                set_airfoil_database(path=db_dir)
-            else:   # db_type == 'propeller'
-                set_propeller_database(path=db_dir)
+        if self.db_type == 'airfoil':
 
-        self.main_win.console_te.append('\n'.join(output))
+            with Capturing() as output:
+                set_airfoil_database(path=db_dir)
+            self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
+
+        else:   # db_type == 'propeller'
+
+            with Capturing() as output:
+                set_propeller_database(path=db_dir)
+            self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
+
         self.found_lbl.setText(self.found_txt)
+        self.currentDatabaseChanged.emit(self.db_dir)
 
     def set_btn_clicked(self):
         cap = 'Set {} database directory'.format(self.db_type)
@@ -149,7 +169,7 @@ class RangeLineEditWidget(QtWidgets.QWidget):
 
         lay.addWidget(self.step_box)    # but was the step box really even stuck?
         lay.addWidget(PDT_Label('=', font_size=12))
-        self.equals_le = PDT_LineEdit('[]', font_size=8, italic=True, width=110)
+        self.equals_le = PDT_LineEdit('[]', font_size=8, italic=True, width=110, read_only=True)
         lay.addWidget(self.equals_le)
         lay.addStretch()
 
@@ -188,189 +208,31 @@ class RangeLineEditWidget(QtWidgets.QWidget):
 
 
 class AxesComboBoxWidget(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self, x_txts: list = None, y_txts: list = None, init_xtxt: str = None, init_ytxt: str = None):
         super(AxesComboBoxWidget, self).__init__()
         lay = QtWidgets.QHBoxLayout()
         self.setLayout(lay)
+        self.x_txts = x_txts if x_txts is not None else ''
+        self.y_txts = y_txts if y_txts is not None else ''
+        self.init_xtxt = init_xtxt
+        self.init_ytxt = init_ytxt
 
         self.yax_cb = PDT_ComboBox(width=100)
-        af_plopts = ['alpha', 'CL', 'CD', 'CDp', 'CM', 'Top_Xtr', 'Bot_Xtr', 'CL/CD']
-        self.yax_cb.addItems(['y-axis'] + af_plopts)
-        self.yax_cb.setCurrentText('CL')
+        self.yax_cb.addItems(self.y_txts)
         lay.addWidget(self.yax_cb)
         lay.addWidget(PDT_Label('versus'))
         self.xax_cb = PDT_ComboBox(width=100)
-        self.xax_cb.addItems(['x-axis'] + af_plopts)
-        self.xax_cb.setCurrentText('CD')
+        self.xax_cb.addItems(self.x_txts)
         lay.addWidget(self.xax_cb)
         lay.addStretch()
 
+        self.set_init_xtxt()
+        self.set_init_ytxt()
 
-class ExistingFoilDataWidget(QtWidgets.QWidget):
-    def __init__(self, main_win: 'InterfaceMainWindow'):
-        super(ExistingFoilDataWidget, self).__init__()
-        self.main_win = main_win
+    def set_init_xtxt(self):
+        if self.init_xtxt is not None:
+            self.xax_cb.setCurrentText(self.init_xtxt)
 
-        lay = QtWidgets.QVBoxLayout()
-        self.setLayout(lay)
-
-        title_lbl = PDT_Label('Existing Data (plot controls)', font_size=14)
-        lay.addWidget(title_lbl)
-        btm_lay = QtWidgets.QHBoxLayout()
-        lay.addLayout(btm_lay)
-
-        # RE
-        re_grp = PDT_GroupBox('RE', font_size=11)
-        self.re_lay = QtWidgets.QGridLayout()
-        re_grp.setLayout(self.re_lay)
-        btm_lay.addWidget(re_grp)
-
-        # mach
-        mach_grp = PDT_GroupBox('Mach', font_size=11)
-        self.mach_lay = QtWidgets.QVBoxLayout()
-        mach_grp.setLayout(self.mach_lay)
-        btm_lay.addWidget(mach_grp)
-
-        # ncrit
-        ncrit_grp = PDT_GroupBox('Ncrit', font_size=11)
-        self.ncrit_lay = QtWidgets.QVBoxLayout()
-        ncrit_grp.setLayout(self.ncrit_lay)
-        btm_lay.addWidget(ncrit_grp)
-
-        # gets the all checkboxes in there
-        self.update_airfoil()
-
-    def update_airfoil(self, af: Airfoil = None):
-        delete_all_widgets_from_layout(layout=self.re_lay)
-        delete_all_widgets_from_layout(layout=self.mach_lay)
-        delete_all_widgets_from_layout(layout=self.ncrit_lay)
-
-        row = -1
-        if af is not None:
-            res, machs, ncrits = af.get_polar_data_grid()
-            for i, re in enumerate(res):
-                chk = PDT_CheckBox('{:.1e}'.format(re), checked=True)
-                if i < len(res) / 2:
-                    row = i
-                    col = 0
-                else:
-                    row = i - int(len(res) / 2)
-                    col = 1
-                self.re_lay.addWidget(chk, i, 0)
-                self.re_lay.addWidget(chk, row, col)
-            for mach in machs:
-                chk = PDT_CheckBox('{:.2f}'.format(mach), checked=True)
-                self.mach_lay.addWidget(chk)
-            for ncrit in ncrits:
-                chk = PDT_CheckBox('{}'.format(ncrit), checked=True)
-                self.ncrit_lay.addWidget(chk)
-
-        self.all_re_chk = PDT_CheckBox('(Un)check all', checked=True)
-        self.re_lay.addWidget(self.all_re_chk, row + 1, 0)
-        self.all_mach_chk = PDT_CheckBox('(Un)check all', checked=True)
-        self.mach_lay.addWidget(self.all_mach_chk)
-        self.all_ncrit_chk = PDT_CheckBox('(Un)check all', checked=True)
-        self.ncrit_lay.addWidget(self.all_ncrit_chk)
-
-
-class FoilDataPointWidget(QtWidgets.QWidget):
-    def __init__(self, main_win: 'InterfaceMainWindow'):
-        super(FoilDataPointWidget, self).__init__()
-        self.main_win = main_win
-
-        lay = QtWidgets.QFormLayout()
-        self.setLayout(lay)
-
-        overwrite_chk = PDT_CheckBox('Overwrite Existing Data?', font_size=11)
-        lay.addRow(PDT_Label('Add\nDatapoints\nBy Range:', font_size=14), overwrite_chk)
-        lay.setAlignment(overwrite_chk, QtCore.Qt.AlignBottom)
-        self.re_rle = RangeLineEditWidget(box_range=[1e4, 1e9], default_strs=['1e6', '1e7', '3e6'],
-                                          spin_double_science='science')
-        self.mach_rle = RangeLineEditWidget(box_range=[0, 10], box_single_step=0.05,
-                                            default_strs=['0.00', '0.00', '0.10'], spin_double_science='double')
-        self.ncrit_rle = RangeLineEditWidget(box_range=[4, 14], box_single_step=1, default_strs=['9', '9', '1'],
-                                             spin_double_science='spin')
-        lay.addRow(PDT_Label('Re:', font_size=12), self.re_rle)
-        lay.addRow(PDT_Label('Mach:', font_size=12), self.mach_rle)
-        lay.addRow(PDT_Label('Ncrit:', font_size=12), self.ncrit_rle)
-
-        self.add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
-        self.reset_btn = PDT_PushButton('Reset Ranges', font_size=12, width=130)
-        btn_lay = QtWidgets.QHBoxLayout()
-        btn_lay.addStretch()
-        btn_lay.addWidget(self.add_btn)
-        btn_lay.addWidget(self.reset_btn)
-        btn_lay.addStretch()
-        lay.addRow(btn_lay)
-        lay.setAlignment(btn_lay, QtCore.Qt.AlignRight)
-        lay.setLabelAlignment(QtCore.Qt.AlignRight)
-
-    def reset_ranges(self):
-        self.re_rle.reset_boxes()
-        self.mach_rle.reset_boxes()
-        self.ncrit_rle.reset_boxes()
-
-    def get_re_range(self):
-        return self.re_rle.get_start_stop_step()
-
-    def get_mach_range(self):
-        return self.mach_rle.get_start_stop_step()
-
-    def get_ncrit_range(self):
-        return self.ncrit_rle.get_start_stop_step()
-
-
-class FoilAnalysisWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super(FoilAnalysisWidget, self).__init__()
-
-        # airfoil group
-        af_lay = QtWidgets.QHBoxLayout()
-        self.setLayout(af_lay)
-        af_left_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_left_lay)
-        af_center_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_center_lay)
-        af_right_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_right_lay)
-
-        # airfoil left
-        af_left_lay.addStretch()
-        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
-        af_left_lay.addWidget(self.exist_data_widg)
-        af_left_lay.addStretch()
-        self.add_foil_data_widg = FoilDataPointWidget(main_win=self)
-        af_left_lay.addWidget(self.add_foil_data_widg)
-        af_left_lay.addStretch()
-
-        # airfoil center
-        af_center_top_lay = QtWidgets.QFormLayout()
-        af_center_lay.addLayout(af_center_top_lay)
-        self.select_foil_cb = PDT_ComboBox(width=150)
-        self.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
-        af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14), self.select_foil_cb)
-        self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
-        af_center_lay.addWidget(self.foil_xy_canvas)
-
-        # airfoil right
-        af_right_top_lay = QtWidgets.QFormLayout()
-        af_right_lay.addLayout(af_right_top_lay)
-        ax_cb_widg = AxesComboBoxWidget()
-        self.af_yax_cb, self.af_xax_cb = ax_cb_widg.yax_cb, ax_cb_widg.xax_cb
-        af_right_top_lay.addRow(PDT_Label('Plot Metric:', font_size=14), ax_cb_widg)
-        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=4.5)
-        af_right_lay.addWidget(self.foil_metric_canvas)
-
-
-class PropellerWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super(PropellerWidget, self).__init__()
-        main_lay = QtWidgets.QHBoxLayout()
-        self.setLayout(main_lay)
-
-
-class OptimizationWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super(OptimizationWidget, self).__init__()
-        main_lay = QtWidgets.QHBoxLayout()
-        self.setLayout(main_lay)
+    def set_init_ytxt(self):
+        if self.init_ytxt is not None:
+            self.yax_cb.setCurrentText(self.init_ytxt)

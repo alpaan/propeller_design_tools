@@ -3,6 +3,9 @@ import propeller_design_tools as pdt
 
 pdt.start_ui()
 
+# prop = pdt.Propeller(name='MyPropeller')
+# prop.plot_mpl3d_geometry()
+
 # af = pdt.Airfoil('clarky.dat')
 # af.plot_geometry()
 # af.plot_polar_data(x_param='CD', y_param='CL')

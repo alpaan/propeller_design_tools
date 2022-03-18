@@ -41,6 +41,7 @@ class Propeller(object):
         # if no kwargs were given and there's a meta_file, load it
         if len(kwargs) == 0:
             if os.path.exists(self.meta_file):
+                Info(s='Loading propeller "meta-file" ({})'.format(self.meta_file))
                 self.load_from_savefile()
             else:
                 raise FileNotFoundError('Could not find file {}'.format(self.meta_file))
@@ -183,15 +184,18 @@ class Propeller(object):
     def load_from_savefile(self):
         # 1st set attrs from the PDT metafile
         self.read_pdt_metafile()
+        Info(s='Successfully read meta-file (.meta)!', indent_level=1)
 
         # set the stations... why did I do it this way??
-        self.set_stations(plot_also=False, verbose=True)
+        self.set_stations(plot_also=False, verbose=True, from_loadsave_file=True)
 
         # then read in the XROTOR restart file (in the xrotor_geometry_files)
         self.xrotor_d = self.read_xrotor_restart()
+        Info(s='Successfully read XROTOR restart file (.xrr)!', indent_level=1)
 
         # then read the operating point output file (in xrotor_op_files)
         self.xrotor_op_dict = funcs.read_xrotor_op_file(fpath=self.xrop_file)
+        Info(s='Successfully read XROTOR operating-point file (.xrop)!', indent_level=1)
 
         # and finally read in the point cloud files
         self.blade_xyz_profiles = {}
@@ -200,12 +204,15 @@ class Propeller(object):
             prof_num = int(fname.replace('profile_', '').replace('.txt', ''))
             xyz_prof = funcs.read_profile_xyz(fpath=os.path.join(self.bld_prof_folder, fname))
             self.blade_xyz_profiles[prof_num] = xyz_prof
+        Info(s='Successfully read blade profiles!', indent_level=1)
 
         return
 
-    def set_stations(self, plot_also: bool = True, verbose: bool = False):
-        self.stations, txt = funcs.create_radial_stations(prop=self, plot_also=plot_also,
-                                                        verbose=verbose)
+    def set_stations(self, plot_also: bool = True, verbose: bool = False, from_loadsave_file: bool = False):
+        if not from_loadsave_file:
+            self.stations, txt = funcs.create_radial_stations(prop=self, plot_also=plot_also, verbose=verbose)
+        else:
+            self.stations, txt = None, ''
         return txt
 
     def set_blade_data(self, blade_dict: dict):
@@ -459,6 +466,109 @@ class Propeller(object):
             savepath = os.path.join(os.getcwd(), '{}.png'.format(ax3d.get_title()))
             fig.savefig(savepath)
             Info('Saved PNG to "{}"'.format(savepath))
+
+    def plot_mpl3d_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
+                            input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False, fig=None):
+        if fig is not None:
+            ax3d = fig.axes[0]
+            leg_anchor = (-0.15, 1.0)
+        else:
+            fig = plt.figure(figsize=[8, 6])
+            ax3d = fig.add_subplot(111, projection='3d')
+            leg_anchor = (0.90, 1.0)
+
+        ax3d.set_xlabel('X')
+        ax3d.set_ylabel('Y')
+        ax3d.set_zlabel('Z')
+
+        title_txt = 'Propeller Geometry - {}'.format(self.name)
+        ax3d.set_title(title_txt)
+
+        blades = np.arange(self.xrotor_d['Nblds'])
+        angles = 360 / self.xrotor_d['Nblds'] * blades
+
+        # plot le and te lines
+        if LE:
+            for ang in angles:
+                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+                le_line, = ax3d.plot3D(xs=[pt[0] for pt in le_pts], ys=[pt[1] for pt in le_pts],
+                                       zs=[pt[2] for pt in le_pts], c='k', lw=2)
+        else:
+            le_line = None
+
+        if TE:
+            for ang in angles:
+                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+                te_line, = ax3d.plot3D(xs=[pt[0] for pt in te_pts], ys=[pt[1] for pt in te_pts],
+                                       zs=[pt[2] for pt in te_pts], c='k', ls='-.', lw=2)
+        else:
+            te_line = None
+
+        # plot stations
+        if chords_betas:
+            for ang in angles:
+                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+                for le_pt, te_pt in zip(le_pts, te_pts):
+                    station_line, = ax3d.plot3D(xs=[le_pt[0], te_pt[0]], ys=[le_pt[1], te_pt[1]], zs=[le_pt[2], te_pt[2]],
+                                                c='rosybrown', lw=1, ls='--')
+        else:
+            station_line = None
+
+        # plot station_params
+        if input_stations:
+            radii = self.xrotor_d['r/R'] * self.radius
+            chords = self.xrotor_d['C/R'] * self.radius
+            betas = self.xrotor_d['Beta0deg'].copy()
+            for roR, foil_name in self.station_params.items():
+                # station dimensionalized parameters
+                r = roR * self.radius
+                ch = np.interp(r, radii, chords)
+                beta = np.interp(r, radii, betas)
+                sk = self.geo_params['tot_skew'] * roR
+
+                # load the foil, shift, flip, and dimensionalize coordinates
+                foil = Airfoil(foil_name, verbose=False)
+                xc, yc, zc = funcs.generate_3D_profile_points(nondim_xy_coords=foil.get_coords(), radius=r,
+                                                              axis_shift=0.25, chord_len=ch, beta_deg=beta,
+                                                              skew_deg=sk)
+                foils_line, = ax3d.plot3D(xs=xc, ys=yc, zs=zc, c='red', alpha=0.7, lw=1)
+        else:
+            foils_line = None
+
+        # plot interpolated profiles
+        if interp_profiles:
+            for prof_num, prof_xyz in self.blade_xyz_profiles.items():
+                xc, yc, zc = prof_xyz
+                prof_line, = ax3d.plot3D(xs=xc, ys=yc, zs=zc, c='maroon', lw=1, alpha=0.7)
+        else:
+            prof_line = None
+
+        # plot hub
+        if hub:
+            hub_thickness = abs(max([pt[2] for pt in le_pts]) - min([pt[2] for pt in te_pts]))
+            theta = np.linspace(0, np.pi * 2, 50)
+            hub_x = np.cos(theta) * self.hub_radius
+            hub_y = np.sin(theta) * self.hub_radius
+            top_zs = np.ones(len(hub_x)) * hub_thickness / 2
+            bot_zs = -np.ones(len(hub_x)) * hub_thickness / 2
+            hub_line, = ax3d.plot3D(xs=hub_x, ys=hub_y, zs=top_zs, c='gray', lw=2)
+            hub_line, = ax3d.plot3D(xs=hub_x, ys=hub_y, zs=bot_zs, c='gray', lw=2)
+        else:
+            hub_line = None
+
+        # set square axes and finish up formatting stuff
+        lim = (-self.radius * 0.65, self.radius * 0.65)
+        ax3d.set_xlim(lim)
+        ax3d.set_ylim(lim)
+        ax3d.set_zlim(lim)
+        leg_handles = [le_line, te_line, hub_line, foils_line, station_line, prof_line]
+        leg_labels = ['L.E.', 'T.E.', 'Hub', 'Input Stations', 'XROTOR Stations', 'Interpolated Geom.']
+
+        leg_labels = [leg_labels[n] for n in range(len(leg_handles)) if leg_handles[n] is not None]
+        leg_handles = [leg_handles[n] for n in range(len(leg_handles)) if leg_handles[n] is not None]
+        ax3d.legend(leg_handles, leg_labels, loc='upper left', bbox_to_anchor=leg_anchor)
+
+        return fig
 
     def generate_stl_geometry(self, plot_after: bool = True, verbose: bool = True):
         n_prof = len(self.blade_xyz_profiles)

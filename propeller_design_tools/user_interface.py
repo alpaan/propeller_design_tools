@@ -2,11 +2,14 @@ import numpy as np
 import os
 from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.user_settings import _get_cursor_fpath
+from propeller_design_tools.funcs import get_all_airfoil_files, get_all_propeller_dirs
 try:
     from PyQt5 import QtWidgets, QtGui
     from propeller_design_tools.helper_ui_classes import Capturing, DatabaseSelectionWidget, SingleAxCanvas, \
-        FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget, PdtGuiPrinter, FoilAnalysisWidget, \
-        PropellerWidget, OptimizationWidget
+        AxesComboBoxWidget, PdtGuiPrinter
+    from propeller_design_tools.foil_ui_classes import ExistingFoilDataWidget, FoilAnalysisWidget, FoilDataPointWidget
+    from propeller_design_tools.prop_ui_classes import PropellerWidget
+    from propeller_design_tools.opt_ui_classes import OptimizationWidget
     from propeller_design_tools.helper_ui_subclasses import PDT_TextEdit, PDT_GroupBox, PDT_Label, PDT_PushButton, \
         PDT_ComboBox, PDT_TabWidget
 except:
@@ -21,7 +24,6 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.foil = foil
 
         cursor_fpath = _get_cursor_fpath()
-        print(cursor_fpath)
         cursor = QtGui.QCursor(QtGui.QPixmap(cursor_fpath))
         self.setCursor(cursor)
 
@@ -44,7 +46,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         center_lay.addWidget(tab_widg)
         self.af_widg = FoilAnalysisWidget()
         tab_widg.addTab(self.af_widg, 'Airfoil Analysis'.upper())
-        self.prop_widg = PropellerWidget()
+        self.prop_widg = PropellerWidget(main_win=self)
         tab_widg.addTab(self.prop_widg, 'Propellers'.upper())
         self.opt_widg = OptimizationWidget()
         tab_widg.addTab(self.opt_widg, 'Optimization'.upper())
@@ -53,31 +55,43 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         # settings group
         sett_lay = QtWidgets.QFormLayout()
         sett_grp.setLayout(sett_lay)
-        af_db_select_widg = DatabaseSelectionWidget(main_win=self, db_type='airfoil')
-        sett_lay.addRow(PDT_Label('Airfoil Database:', font_size=14), af_db_select_widg)
-        prop_db_select_widg = DatabaseSelectionWidget(main_win=self, db_type='propeller')
-        sett_lay.addRow(PDT_Label('Propeller Database:', font_size=14), prop_db_select_widg)
+        self.af_db_select_widg = DatabaseSelectionWidget(main_win=self, db_type='airfoil')
+        sett_lay.addRow(PDT_Label('Airfoil Database:', font_size=14), self.af_db_select_widg)
+        self.prop_db_select_widg = DatabaseSelectionWidget(main_win=self, db_type='propeller')
+        sett_lay.addRow(PDT_Label('Propeller Database:', font_size=14), self.prop_db_select_widg)
 
         # console group
         console_lay = QtWidgets.QVBoxLayout()
         console_grp.setLayout(console_lay)
-        self.console_te = PDT_TextEdit()
+        self.console_te = PDT_TextEdit(height=150)
         console_lay.addWidget(self.console_te)
         clear_console_btn = PDT_PushButton('Clear', font_size=11, width=100)
         clear_console_btn.clicked.connect(self.clear_console_btn_clicked)
         console_lay.addWidget(clear_console_btn)
 
         # call these last because they rely on self.console_te existing
-        af_db_select_widg.set_current_db()
-        prop_db_select_widg.set_current_db()
+        self.af_db_select_widg.set_current_db()
+        self.prop_db_select_widg.set_current_db()
         self.printer = PdtGuiPrinter(console_te=self.console_te)
 
         # connecting signals
+        self.af_db_select_widg.currentDatabaseChanged.connect(self.repop_select_foil_cb)
         self.af_widg.add_foil_data_widg.add_btn.clicked.connect(self.add_foil_data_btn_clicked)
         self.af_widg.add_foil_data_widg.reset_btn.clicked.connect(self.reset_foil_ranges_btn_clicked)
         self.af_widg.select_foil_cb.currentTextChanged.connect(self.select_foil_cb_changed)
         self.af_widg.af_yax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
         self.af_widg.af_xax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
+
+        self.prop_db_select_widg.currentDatabaseChanged.connect(self.repop_select_prop_cb)
+
+    def repop_select_prop_cb(self):
+        self.print('Changing Propeller Database...')
+        self.prop_widg.control_widg.populate_select_prop_cb()
+
+    def repop_select_foil_cb(self):
+        self.print('Changing Airfoil Database...')
+        self.af_widg.select_foil_cb.clear()
+        self.af_widg.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
 
     def af_metric_cb_changed(self):
         self.af_widg.foil_metric_canvas.axes.clear()
@@ -140,20 +154,6 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         res = np.arange(re_min, re_max, re_step)
         machs = np.arange(mach_min, mach_max, mach_step)
         ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
-
-
-        # re_txts = self.af_widg.add_foil_data_widg.re_rle.equals_le.text()\
-        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
-        # mach_txts = self.af_widg.add_foil_data_widg.mach_rle.equals_le.text()\
-        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
-        # ncrits_txts = self.af_widg.add_foil_data_widg.ncrit_rle.equals_le.text()\
-        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
-        # print(re_txts)
-        # res = [int(re_str.split('e')[0]) * 10 ** int(re_str.split('e')[1].replace('+', '').replace('-', ''))
-        #        for re_str in re_txts]
-        # print(res)
-        # machs = [float(mach_str) for mach_str in mach_txts]
-        # ncrits = [int(ncrit_str) for ncrit_str in ncrits_txts]
 
         for re in res:
             for mach in machs:
