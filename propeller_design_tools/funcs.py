@@ -912,14 +912,6 @@ def generate_3D_profile_points(nondim_xy_coords: np.ndarray, radius: float, axis
 
 # ===== USER INTERFACE STUFF =====
 def start_ui():
-    from PyQt5 import QtWidgets
-    import sys
-    from propeller_design_tools.user_interface import InterfaceMainWindow
-
-    app = QtWidgets.QApplication(sys.argv)
-    w = InterfaceMainWindow()
-    w.show()
-    app.exec_()
     return
 
 

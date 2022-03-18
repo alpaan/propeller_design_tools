@@ -98,7 +98,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         player.setMedia(content)
         player.setVolume(20)
         player.play()
-        app.exec_()
+        app.exec()
 
     def repop_select_prop_cb(self):
         self.print('Changing Propeller Database...')
