@@ -5,7 +5,8 @@ from propeller_design_tools.user_settings import _get_cursor_fpath
 try:
     from PyQt5 import QtWidgets, QtGui
     from propeller_design_tools.helper_ui_classes import Capturing, DatabaseSelectionWidget, SingleAxCanvas, \
-        FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget, PdtGuiPrinter, FoilAnalysisWidget, PropellerWidget
+        FoilDataPointWidget, AxesComboBoxWidget, ExistingFoilDataWidget, PdtGuiPrinter, FoilAnalysisWidget, \
+        PropellerWidget, OptimizationWidget
     from propeller_design_tools.helper_ui_subclasses import PDT_TextEdit, PDT_GroupBox, PDT_Label, PDT_PushButton, \
         PDT_ComboBox, PDT_TabWidget
 except:
@@ -41,9 +42,12 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         tab_widg = PDT_TabWidget(font_size=16, italic=True)
         center_lay.addWidget(tab_widg)
         self.af_widg = FoilAnalysisWidget()
-        tab_widg.addTab(self.af_widg, 'Airfoil Analysis')
-        prop_widg = PropellerWidget()
-        tab_widg.addTab(prop_widg, 'Propellers')
+        tab_widg.addTab(self.af_widg, 'Airfoil Analysis'.upper())
+        self.prop_widg = PropellerWidget()
+        tab_widg.addTab(self.prop_widg, 'Propellers'.upper())
+        self.opt_widg = OptimizationWidget()
+        tab_widg.addTab(self.opt_widg, 'Optimization'.upper())
+
 
         # settings group
         sett_lay = QtWidgets.QFormLayout()
@@ -128,21 +132,27 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
             self.print('Must select a foil first!')
             return
 
-        re_min = int(float(self.af_widg.add_foil_data_widg.re_rle.left_box.text()))
-        re_step = int(float(self.af_widg.add_foil_data_widg.re_rle.step_box.text()))
-        re_max = int(float(self.af_widg.add_foil_data_widg.re_rle.right_box.text())) + re_step
-
-        mach_min = float(self.af_widg.add_foil_data_widg.mach_rle.left_box.text())
-        mach_step = float(self.af_widg.add_foil_data_widg.mach_rle.step_box.text())
-        mach_max = float(self.af_widg.add_foil_data_widg.mach_rle.right_box.text()) + mach_step
-
-        ncrit_min = int(self.af_widg.add_foil_data_widg.ncrit_rle.left_box.text())
-        ncrit_step = int(self.af_widg.add_foil_data_widg.ncrit_rle.step_box.text())
-        ncrit_max = int(self.af_widg.add_foil_data_widg.ncrit_rle.right_box.text()) + ncrit_step
+        re_min, re_max, re_step = self.af_widg.add_foil_data_widg.get_re_range()
+        mach_min, mach_max, mach_step = self.af_widg.add_foil_data_widg.get_mach_range()
+        ncrit_min, ncrit_max, ncrit_step = self.af_widg.add_foil_data_widg.get_ncrit_range()
 
         res = np.arange(re_min, re_max, re_step)
         machs = np.arange(mach_min, mach_max, mach_step)
         ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
+
+
+        # re_txts = self.af_widg.add_foil_data_widg.re_rle.equals_le.text()\
+        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
+        # mach_txts = self.af_widg.add_foil_data_widg.mach_rle.equals_le.text()\
+        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
+        # ncrits_txts = self.af_widg.add_foil_data_widg.ncrit_rle.equals_le.text()\
+        #     .replace('[', '').replace(']', '').replace("'", '').replace(' ', '').split(',')
+        # print(re_txts)
+        # res = [int(re_str.split('e')[0]) * 10 ** int(re_str.split('e')[1].replace('+', '').replace('-', ''))
+        #        for re_str in re_txts]
+        # print(res)
+        # machs = [float(mach_str) for mach_str in mach_txts]
+        # ncrits = [int(ncrit_str) for ncrit_str in ncrits_txts]
 
         for re in res:
             for mach in machs:

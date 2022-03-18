@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
 from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db, delete_all_widgets_from_layout, \
     get_all_airfoil_files, get_all_propeller_dirs
@@ -109,25 +110,28 @@ class RangeLineEditWidget(QtWidgets.QWidget):
         self.box_range = box_range
         self.box_single_step = box_single_step
         self.default_strs = default_strs
+        self.spin_double_science = spin_double_science
 
         super(RangeLineEditWidget, self).__init__()
         lay = QtWidgets.QHBoxLayout()
         self.setLayout(lay)
 
-        left_default, right_default, step_default = self.default_strs
+        self.left_default, self.right_default, self.step_default = self.default_strs
         if spin_double_science == 'double':
             self.left_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=self.box_range,
-                                              box_single_step=self.box_single_step, special_str=left_default)
+                                              box_single_step=self.box_single_step, default_str=self.left_default)
             self.right_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=self.box_range,
-                                               box_single_step=self.box_single_step, special_str=right_default)
+                                               box_single_step=self.box_single_step, default_str=self.right_default)
         elif spin_double_science == 'spin':
             self.left_box = PDT_SpinBox(font_size=12, width=80, box_range=self.box_range,
-                                        box_single_step=self.box_single_step, special_str=left_default)
+                                        box_single_step=self.box_single_step, default_str=self.left_default)
             self.right_box = PDT_SpinBox(font_size=12, width=80, box_range=self.box_range,
-                                         box_single_step=self.box_single_step, special_str=right_default)
+                                         box_single_step=self.box_single_step, default_str=self.right_default)
         else:  # spin_double_science == 'science'
-            self.left_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=left_default, box_range=self.box_range)
-            self.right_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=right_default, box_range=self.box_range)
+            self.left_box = PDT_ScienceSpinBox(font_size=12, width=80, default_str=self.left_default,
+                                               box_range=self.box_range)
+            self.right_box = PDT_ScienceSpinBox(font_size=12, width=80, default_str=self.right_default,
+                                                box_range=self.box_range)
 
         lay.addWidget(self.left_box)
         lay.addWidget(PDT_Label('->', font_size=12))
@@ -136,18 +140,51 @@ class RangeLineEditWidget(QtWidgets.QWidget):
 
         if spin_double_science == 'double':
             self.step_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=[0, 10],
-                                              box_single_step=0.01, special_str=step_default)
+                                              box_single_step=0.01, default_str=self.step_default)
         elif spin_double_science == 'spin':
             self.step_box = PDT_SpinBox(font_size=12, width=80, box_range=[1, 1e8],
-                                        box_single_step=1, special_str=step_default)
+                                        box_single_step=1, default_str=self.step_default)
         else:  # spin_double_science == 'science'
-            self.step_box = PDT_ScienceSpinBox(font_size=12, width=80, special_str=step_default, box_range=[1e3, 1e9])
+            self.step_box = PDT_ScienceSpinBox(font_size=12, width=80, default_str=self.step_default, box_range=[1e3, 1e9])
 
         lay.addWidget(self.step_box)    # but was the step box really even stuck?
         lay.addWidget(PDT_Label('=', font_size=12))
-        self.equals_le = PDT_LineEdit('[]', font_size=12, italic=True, width=110)
+        self.equals_le = PDT_LineEdit('[]', font_size=8, italic=True, width=110)
         lay.addWidget(self.equals_le)
         lay.addStretch()
+
+        self.update_equals_box()
+
+        # connect some signals now
+        self.left_box.valueChanged.connect(self.update_equals_box)
+        self.right_box.valueChanged.connect(self.update_equals_box)
+        self.step_box.valueChanged.connect(self.update_equals_box)
+
+    def update_equals_box(self):
+        start, stop, step = self.get_start_stop_step()
+        step = 1 if step == 0 else step
+        if self.spin_double_science == 'spin':
+            form_txt = '{:d}'
+        elif self.spin_double_science == 'double':
+            form_txt = '{:.2f}'
+        else:  # spin_double_science == 'science'
+            form_txt = '{:.1e}'
+
+        equals_txt = '{}'.format([form_txt.format(val) for val in np.arange(start, stop, step)])
+        self.equals_le.setText(equals_txt)
+        return
+
+    def reset_boxes(self):
+        self.left_box.setValue(self.left_box.valueFromText(self.left_default))
+        self.right_box.setValue(self.right_box.valueFromText(self.right_default))
+        self.step_box.setValue(self.step_box.valueFromText(self.step_default))
+        self.update_equals_box()
+
+    def get_start_stop_step(self):
+        start = self.left_box.valueFromText(self.left_box.text())
+        step = self.step_box.valueFromText(self.step_box.text())
+        stop = self.right_box.valueFromText(self.right_box.text()) + step
+        return start, stop, step
 
 
 class AxesComboBoxWidget(QtWidgets.QWidget):
@@ -269,15 +306,18 @@ class FoilDataPointWidget(QtWidgets.QWidget):
         lay.setLabelAlignment(QtCore.Qt.AlignRight)
 
     def reset_ranges(self):
-        self.re_rle.left_box.setValue(0)
-        self.re_rle.right_box.setValue(0)
-        self.re_rle.step_box.setValue(0)
-        self.mach_rle.left_box.setValue(0)
-        self.mach_rle.right_box.setValue(0)
-        self.mach_rle.step_box.setValue(0)
-        self.ncrit_rle.left_box.setValue(0)
-        self.ncrit_rle.right_box.setValue(0)
-        self.ncrit_rle.step_box.setValue(0)
+        self.re_rle.reset_boxes()
+        self.mach_rle.reset_boxes()
+        self.ncrit_rle.reset_boxes()
+
+    def get_re_range(self):
+        return self.re_rle.get_start_stop_step()
+
+    def get_mach_range(self):
+        return self.mach_rle.get_start_stop_step()
+
+    def get_ncrit_range(self):
+        return self.ncrit_rle.get_start_stop_step()
 
 
 class FoilAnalysisWidget(QtWidgets.QWidget):
@@ -325,3 +365,12 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
 class PropellerWidget(QtWidgets.QWidget):
     def __init__(self):
         super(PropellerWidget, self).__init__()
+        main_lay = QtWidgets.QHBoxLayout()
+        self.setLayout(main_lay)
+
+
+class OptimizationWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(OptimizationWidget, self).__init__()
+        main_lay = QtWidgets.QHBoxLayout()
+        self.setLayout(main_lay)

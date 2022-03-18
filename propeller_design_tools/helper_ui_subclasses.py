@@ -279,7 +279,7 @@ class PDT_SpinBox(QtWidgets.QSpinBox):
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
         height = kwargs.pop('height') if 'height' in kwargs else None
-        special_str = kwargs.pop('special_str') if 'special_str' in kwargs else None
+        default_str = kwargs.pop('default_str') if 'default_str' in kwargs else None
         box_range = kwargs.pop('box_range') if 'box_range' in kwargs else None
         box_single_step = kwargs.pop('box_single_step') if 'box_single_step' in kwargs else None
 
@@ -292,7 +292,7 @@ class PDT_SpinBox(QtWidgets.QSpinBox):
         self.set_height(height=height)
         self.set_box_range(box_range=box_range)
         self.set_box_single_step(box_single_step=box_single_step)
-        self.set_special_str(special_str=special_str)
+        self.set_default_str(default_str=default_str)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -317,9 +317,9 @@ class PDT_SpinBox(QtWidgets.QSpinBox):
         if height is not None:
             self.setFixedHeight(height)
 
-    def set_special_str(self, special_str: str):
-        if special_str is not None:
-            self.setSpecialValueText(special_str)
+    def set_default_str(self, default_str: str):
+        if default_str is not None:
+            self.setValue(self.valueFromText(default_str))
 
     def set_box_range(self, box_range):
         if box_range is not None:
@@ -337,7 +337,7 @@ class PDT_DoubleSpinBox(QtWidgets.QDoubleSpinBox):
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
         height = kwargs.pop('height') if 'height' in kwargs else None
-        special_str = kwargs.pop('special_str') if 'special_str' in kwargs else None
+        default_str = kwargs.pop('default_str') if 'default_str' in kwargs else None
         box_range = kwargs.pop('box_range') if 'box_range' in kwargs else None
         box_single_step = kwargs.pop('box_single_step') if 'box_single_step' in kwargs else None
 
@@ -350,7 +350,7 @@ class PDT_DoubleSpinBox(QtWidgets.QDoubleSpinBox):
         self.set_height(height=height)
         self.set_box_range(box_range=box_range)
         self.set_box_single_step(box_single_step=box_single_step)
-        self.set_special_str(special_str=special_str)
+        self.set_default_str(default_str=default_str)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -375,9 +375,9 @@ class PDT_DoubleSpinBox(QtWidgets.QDoubleSpinBox):
         if height is not None:
             self.setFixedHeight(height)
 
-    def set_special_str(self, special_str: str):
-        if special_str is not None:
-            self.setSpecialValueText(special_str)
+    def set_default_str(self, default_str: str):
+        if default_str is not None:
+            self.setValue(self.valueFromText(default_str))
 
     def set_box_range(self, box_range):
         if box_range is not None:
@@ -395,7 +395,7 @@ class PDT_ScienceSpinBox(ScientificDoubleSpinBox):
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
         height = kwargs.pop('height') if 'height' in kwargs else None
-        special_str = kwargs.pop('special_str') if 'special_str' in kwargs else None
+        default_str = kwargs.pop('default_str') if 'default_str' in kwargs else None
         box_range = kwargs.pop('box_range') if 'box_range' in kwargs else None
 
         super(PDT_ScienceSpinBox, self).__init__(*args, **kwargs)
@@ -405,7 +405,7 @@ class PDT_ScienceSpinBox(ScientificDoubleSpinBox):
         self.set_font_size(font_size=font_size)
         self.set_width(width=width)
         self.set_height(height=height)
-        self.set_special_str(special_str=special_str)
+        self.set_default_str(default_str=default_str)
         self.set_box_range(box_range=box_range)
 
     def set_italic(self, italic: bool):
@@ -431,9 +431,9 @@ class PDT_ScienceSpinBox(ScientificDoubleSpinBox):
         if height is not None:
             self.setFixedHeight(height)
 
-    def set_special_str(self, special_str: str):
-            if special_str is not None:
-                self.setSpecialValueText(special_str)
+    def set_default_str(self, default_str: str):
+            if default_str is not None:
+                self.setValue(self.valueFromText(default_str))
 
     def set_box_range(self, box_range):
         if box_range is not None:

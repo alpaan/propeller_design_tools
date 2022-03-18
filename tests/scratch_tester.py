@@ -3,7 +3,7 @@ import propeller_design_tools as pdt
 
 pdt.start_ui()
 
-# af = pdt.Airfoil('mrc-16.dat')
+# af = pdt.Airfoil('clarky.dat')
 # af.plot_geometry()
 # af.plot_polar_data(x_param='CD', y_param='CL')
 # af.calculate_xfoil_polars(re=[1e6, 3e6, 5e6, 7e6, 1e7], ncrit=[9], mach=[0])
