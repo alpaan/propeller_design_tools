@@ -21,6 +21,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.foil = foil
 
         cursor_fpath = _get_cursor_fpath()
+        print(cursor_fpath)
         cursor = QtGui.QCursor(QtGui.QPixmap(cursor_fpath))
         self.setCursor(cursor)
 
