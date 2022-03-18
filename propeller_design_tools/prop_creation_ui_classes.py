@@ -2,7 +2,8 @@ from propeller_design_tools.propeller import Propeller
 from propeller_design_tools.funcs import get_all_propeller_dirs
 try:
     from PyQt5 import QtWidgets, QtCore
-    from propeller_design_tools.helper_ui_classes import SingleAxCanvas, Capturing, AxesComboBoxWidget
+    from propeller_design_tools.helper_ui_classes import SingleAxCanvas, Capturing, AxesComboBoxWidget, \
+        PropellerCreationPanelCanvas
     from propeller_design_tools.helper_ui_subclasses import PDT_ComboBox, PDT_Label, PDT_SpinBox, PDT_DoubleSpinBox, \
         PDT_PushButton, PDT_LineEdit
 except:
@@ -25,8 +26,8 @@ class PropellerCreationWidget(QtWidgets.QWidget):
         self.plot3d_widg = Propeller3dPlotWidget(main_win=main_win)
         main_lay.addWidget(self.plot3d_widg)
 
-        self.sweep_widg = PropellerCreationMetricPlotWidget()
-        main_lay.addWidget(self.sweep_widg)
+        self.metric_plot_widget = PropellerCreationMetricPlotWidget(main_win=main_win)
+        main_lay.addWidget(self.metric_plot_widget)
 
         # connecting signals
         self.plot3d_widg.select_prop_cb.currentTextChanged.connect(self.select_prop_cb_changed)
@@ -41,6 +42,7 @@ class PropellerCreationWidget(QtWidgets.QWidget):
                 self.prop = Propeller(name=curr_txt)
             self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
             self.plot3d_widg.update_plot(self.prop)
+        self.metric_plot_widget.update_data()
 
 
 class PropellerCreationControlWidget(QtWidgets.QWidget):
@@ -82,6 +84,9 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         form_lay2a.addRow(PDT_Label('Speed:', font_size=12), self.design_speed_sb)
         self.design_adv_sb = PDT_DoubleSpinBox(width=80)
         form_lay2b.addRow(PDT_Label(''))
+        form_lay2b.addRow(PDT_Label(''))
+        form_lay2b.addRow(PDT_Label(''))
+
         form_lay2b.addRow(PDT_Label('Adv:', font_size=12), self.design_adv_sb)
         self.design_rpm_sb = PDT_DoubleSpinBox(width=80)
         form_lay2b.addRow(PDT_Label('RPM:', font_size=12), self.design_rpm_sb)
@@ -97,7 +102,8 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         form_lay2a.addRow(PDT_Label('Atmosphere\nProperties->', font_size=12), self.atmo_props_widg)
         self.vorform_cb = PDT_ComboBox(width=100)
         self.vorform_cb.addItems(['grad', 'pot', 'vrtx'])
-        form_lay2a.addRow(PDT_Label('Vortex Formulation:', font_size=12), self.vorform_cb)
+        form_lay2a.addRow(PDT_Label('Vortex\nFormulation:', font_size=12), self.vorform_cb)
+        form_lay2a.setAlignment(self.vorform_cb, QtCore.Qt.AlignBottom)
         self.station_params_widg = StationParamsWidget()
         form_lay2a.addRow(PDT_Label('Station\nParameters->', font_size=12), self.station_params_widg)
 
@@ -149,22 +155,75 @@ class Propeller3dPlotWidget(QtWidgets.QWidget):
 
 
 class PropellerCreationMetricPlotWidget(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self, main_win: 'InterfaceMainWindow'):
+        self.main_win = main_win
         super(PropellerCreationMetricPlotWidget, self).__init__()
         main_lay = QtWidgets.QVBoxLayout()
         self.setLayout(main_lay)
+        self.creation_panel_canvas = None
+
+        panel_lay = QtWidgets.QHBoxLayout()
+        main_lay.addLayout(panel_lay)
+        show_btn = PDT_PushButton('Show', font_size=11, width=100)
+        show_btn.clicked.connect(self.show_creation_panel)
+        panel_lay.addWidget(PDT_Label('Creation Panel:', font_size=14, bold=True))
+        panel_lay.addWidget(show_btn)
+        panel_lay.addStretch()
 
         axes_cb_lay = QtWidgets.QHBoxLayout()
         main_lay.addLayout(axes_cb_lay)
-        self.axes_cb_widg = AxesComboBoxWidget(x_txts=['x-axis'], y_txts=['y-axis'], init_xtxt='x-axis', init_ytxt='y-axis')
+        self.plot_opts = ['r/R', 'c/R', 'beta(deg)', 'CL', 'CD', 'RE', 'Mach', 'effi', 'effp', 'GAM', 'Ttot', 'Ptot', 'VA/V',
+                     'VT/V']
+        x_txts = ['x-axis'] + self.plot_opts
+        y_txts = ['y-axis'] + self.plot_opts
+        self.axes_cb_widg = AxesComboBoxWidget(x_txts=x_txts, y_txts=y_txts, init_xtxt='r/R',
+                                               init_ytxt='GAM')
+        self.xax_cb = self.axes_cb_widg.xax_cb
+        self.yax_cb = self.axes_cb_widg.yax_cb
+        self.xax_cb.currentTextChanged.connect(self.update_data)
+        self.yax_cb.currentTextChanged.connect(self.update_data)
+
         axes_cb_lay.addStretch()
-        axes_cb_lay.addWidget(PDT_Label('Plot Metric', font_size=14, bold=True))
+        axes_cb_lay.addWidget(PDT_Label('Plot Metric:', font_size=14, bold=True))
         axes_cb_lay.addWidget(self.axes_cb_widg)
         axes_cb_lay.addStretch()
 
         self.plot_canvas = SingleAxCanvas(self, width=4.5, height=5)
         self.axes = self.plot_canvas.axes
         main_lay.addWidget(self.plot_canvas)
+
+    def update_data(self):
+        self.plot_canvas.axes.clear()
+        yax_txt = self.yax_cb.currentText()
+        xax_txt = self.xax_cb.currentText()
+        if yax_txt != 'y-axis' and xax_txt != 'x-axis':
+            prop = self.main_win.prop_widg.prop
+            if prop is not None:
+                self.axes.set_xlabel(xax_txt)
+                self.axes.set_ylabel(yax_txt)
+                self.axes.grid(True)
+                xdata = prop.xrotor_op_dict[xax_txt]
+                if yax_txt in prop.blade_data:
+                    self.axes.plot(xdata, prop.blade_data[yax_txt], marker='*', markersize=4)
+                else:
+                    if yax_txt in prop.xrotor_op_dict:
+                        self.axes.plot(xdata, prop.xrotor_op_dict[yax_txt], marker='o', markersize=3)
+
+        self.plot_canvas.draw()
+
+    def show_creation_panel(self):
+        prop = self.main_win.prop_widg.prop
+        if prop is not None:
+            self.creation_panel_widg = QtWidgets.QWidget()
+            lay = QtWidgets.QVBoxLayout()
+            self.creation_panel_widg.setLayout(lay)
+
+            self.creation_panel_canvas = PropellerCreationPanelCanvas()
+            lay.addWidget(self.creation_panel_canvas)
+            prop.plot_design_point_panel(fig=self.creation_panel_canvas.figure)
+
+            self.creation_panel_widg.show()
+            self.creation_panel_canvas.draw()
 
 
 class StationParamsWidget(QtWidgets.QWidget):

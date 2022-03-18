@@ -1,19 +1,18 @@
-import sys
 import propeller_design_tools as pdt
 
 
 pdt.start_ui()
 
-# prop = pdt.Propeller(name='MyPropeller2')
+# prop = pdt.Propeller(name='MyPropeller')
+# prop.plot_design_point_panel()
 # prop.plot_mpl3d_geometry()
 
-# af = pdt.Airfoil('e855.dat')
-# af.plot_geometry()
+# af = pdt.Airfoil('clarky.dat')
 # af.plot_polar_data(x_param='CD', y_param='CL')
 # af.calculate_xfoil_polars(re=[7e4], ncrit=[9], mach=[0])
 
 # prop = pdt.Propeller('MyPropeller2')
-# prop.plot_geometry()
+# prop.plot_design_point_panel()
 # prop.plot_ideal_eff()
 
 # pdt.create_propeller(

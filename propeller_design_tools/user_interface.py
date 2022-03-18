@@ -68,9 +68,18 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         console_grp.setLayout(console_lay)
         self.console_te = PDT_TextEdit(height=150)
         console_lay.addWidget(self.console_te)
+        btn_bar_lay = QtWidgets.QHBoxLayout()
         clear_console_btn = PDT_PushButton('Clear', font_size=11, width=100)
         clear_console_btn.clicked.connect(self.clear_console_btn_clicked)
-        console_lay.addWidget(clear_console_btn)
+        btn_bar_lay.addWidget(clear_console_btn)
+
+        self.prog_bar = QtWidgets.QProgressBar()
+        self.prog_bar.setMinimumSize(500, 30)
+        self.prog_bar.setValue(0)
+        btn_bar_lay.addStretch()
+        btn_bar_lay.addWidget(self.prog_bar)
+        btn_bar_lay.addStretch()
+        console_lay.addLayout(btn_bar_lay)
 
         # call these last because they rely on self.console_te existing
         self.af_db_select_widg.set_current_db()
@@ -158,9 +167,12 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.af_widg.exist_data_widg.update_airfoil(af=self.foil)
 
     def add_foil_data_btn_clicked(self):
+
         if self.foil is None:
             self.print('Must select a foil first!')
             return
+
+        self.prog_bar.setValue(0)
 
         re_min, re_max, re_step = self.af_widg.add_foil_data_widg.get_re_range()
         mach_min, mach_max, mach_step = self.af_widg.add_foil_data_widg.get_mach_range()
@@ -170,9 +182,13 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         machs = np.arange(mach_min, mach_max, mach_step)
         ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
 
+        total_polars = len(res) * len(machs) * len(ncrits)
+
+        counter = 0
         for re in res:
             for mach in machs:
                 for ncrit in ncrits:
+                    counter += 1
                     self.print('Calculating...(Re={}, mach={}, ncrit={})'.format(re, mach, ncrit))
                     QtWidgets.QApplication.processEvents()
 
@@ -183,6 +199,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
                     with Capturing() as output:
                         self.foil.load_polar_data()
                     self.console_te.append('\n'.join(output))
+                    self.prog_bar.setValue(int(counter / total_polars * 100))
                     self.select_foil_cb_changed(foil_txt=self.af_widg.select_foil_cb.currentText())  # updates everything
 
     def reset_foil_ranges_btn_clicked(self):

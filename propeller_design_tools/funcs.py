@@ -771,7 +771,7 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
     if not verbose:
         Info('"{}" Geometry Created!'.format(prop.name))
     if plot_after:
-        prop.plot_geometry()
+        prop.plot_design_point_panel()
 
     return prop
 

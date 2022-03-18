@@ -305,29 +305,40 @@ class Propeller(object):
                 for xp, yp, zp in zip(xpts, ypts, zpts):
                     f.write('{:.6f}, {:.6f}, {:.6f}\n'.format(xp, yp, zp))
 
-    def plot_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
-                      input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False):
-        fig = plt.figure(figsize=(18, 10))
-        gs = gridspec.GridSpec(nrows=10, ncols=5, figure=fig)
-        ax3d = fig.add_subplot(gs[0:7, 0:2], projection='3d')
-        txt_ax = fig.add_subplot(gs[7:10, 0:2])
-        radial_axes = {'': None, 'c/R': None, 'beta(deg)': None, 'CL': None, 'CD': None,
-                       'thrust_eff': None, 'RE': None, 'Mach': None, 'effi': None, 'effp': None,
-                       'GAM': None, 'Ttot': None, 'Ptot': None, 'VA/V': None, 'VT/V': None}
-        for i, p in enumerate(radial_axes):
-            row = i % 5
-            col = int(i / 5) + 2
-            if col == 2:
-                ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
-            else:
-                ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
-            radial_axes[p] = ax
-            ax.grid(True)
-            ax.set_ylabel(p)
-            if row == 4:
-                ax.set_xlabel('r/R')
-            if p == '':
-                ax.set_visible(False)
+    def plot_design_point_panel(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
+                                input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False,
+                                fig=None):
+
+        if fig is None:
+            radial_axes = {'': None, 'c/R': None, 'beta(deg)': None, 'CL': None, 'CD': None,
+                           'thrust_eff': None, 'RE': None, 'Mach': None, 'effi': None, 'effp': None,
+                           'GAM': None, 'Ttot': None, 'Ptot': None, 'VA/V': None, 'VT/V': None}
+            gs = gridspec.GridSpec(nrows=10, ncols=5, figure=fig)
+            fig = plt.figure(figsize=(18, 10))
+            ax3d = fig.add_subplot(gs[0:7, 0:2], projection='3d')
+            txt_ax = fig.add_subplot(gs[7:10, 0:2])
+
+            for i, p in enumerate(radial_axes):
+                row = i % 5
+                col = int(i / 5) + 2
+                if col == 2:
+                    ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
+                else:
+                    ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
+                radial_axes[p] = ax
+                ax.grid(True)
+                ax.set_ylabel(p)
+                if row == 4:
+                    ax.set_xlabel('r/R')
+                if p == '':
+                    ax.set_visible(False)
+        else:  # fig is not None -> we were passed a Figure object from a ui class
+            ax3d = fig.axes[0]
+            txt_ax = fig.axes[1]
+            radial_axes = {'': fig.axes[2], 'c/R': fig.axes[3], 'beta(deg)': fig.axes[4], 'CL': fig.axes[5], 'CD': fig.axes[6],
+                           'thrust_eff': fig.axes[7], 'RE': fig.axes[8], 'Mach': fig.axes[9], 'effi': fig.axes[10], 'effp': fig.axes[11],
+                           'GAM': fig.axes[12], 'Ttot': fig.axes[13], 'Ptot': fig.axes[14], 'VA/V': fig.axes[15], 'VT/V': fig.axes[16]}
+
 
         ax3d.set_xlabel('X')
         ax3d.set_ylabel('Y')
@@ -466,6 +477,8 @@ class Propeller(object):
             savepath = os.path.join(os.getcwd(), '{}.png'.format(ax3d.get_title()))
             fig.savefig(savepath)
             Info('Saved PNG to "{}"'.format(savepath))
+
+        return fig
 
     def plot_mpl3d_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
                             input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False, fig=None):

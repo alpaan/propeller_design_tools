@@ -363,7 +363,7 @@ class Airfoil(object):
                 if max(mach_list) == 0:
                     plot_kwargs['alpha'] = 1
                 else:
-                    plot_kwargs['alpha'] = mach_key / max(mach_list)
+                    plot_kwargs['alpha'] = 1.0 - mach_key / max(mach_list) / 2
 
                 for ncrit_key in ncrit_list:
                     marker_cycle = ['o', 'v', '^', '<', '>', 's', '+', 'd', '2']

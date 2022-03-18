@@ -1,7 +1,9 @@
 import os
 import numpy as np
+import matplotlib.gridspec as gridspec
 from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
 from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db
+from propeller_design_tools.propeller import Propeller
 import sys
 from typing import Union
 from io import StringIO
@@ -29,6 +31,40 @@ class SingleAxCanvas(FigureCanvasQTAgg):
             self.axes = fig.add_subplot(111, projection='3d')
 
         super(SingleAxCanvas, self).__init__(fig)
+
+
+class PropellerCreationPanelCanvas(FigureCanvasQTAgg):
+    def __init__(self, *args, **kwargs):
+        width = kwargs.pop('width') if 'width' in kwargs else 18
+        height = kwargs.pop('height') if 'height' in kwargs else 10
+        dpi = kwargs.pop('dpi') if 'dpi' in kwargs else 100
+
+        self.radial_axes = {'': None, 'c/R': None, 'beta(deg)': None, 'CL': None, 'CD': None,
+                       'thrust_eff': None, 'RE': None, 'Mach': None, 'effi': None, 'effp': None,
+                       'GAM': None, 'Ttot': None, 'Ptot': None, 'VA/V': None, 'VT/V': None}
+
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        gs = gridspec.GridSpec(nrows=10, ncols=5, figure=fig)
+
+        self.ax3d = fig.add_subplot(gs[0:7, 0:2], projection='3d')
+        self.txt_ax = fig.add_subplot(gs[7:10, 0:2])
+
+        for i, p in enumerate(self.radial_axes):
+            row = i % 5
+            col = int(i / 5) + 2
+            if col == 2:
+                ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
+            else:
+                ax = fig.add_subplot(gs[2 * row:2 * row + 2, col])
+            self.radial_axes[p] = ax
+            ax.grid(True)
+            ax.set_ylabel(p)
+            if row == 4:
+                ax.set_xlabel('r/R')
+            if p == '':
+                ax.set_visible(False)
+
+        super(PropellerCreationPanelCanvas, self).__init__(fig)
 
 
 class Capturing(list):
