@@ -1,6 +1,8 @@
 import os
 import subprocess
 import shutil
+import sys
+
 import matplotlib.pyplot as plt
 import numpy as np
 from propeller_design_tools.airfoil import Airfoil
@@ -912,7 +914,12 @@ def generate_3D_profile_points(nondim_xy_coords: np.ndarray, radius: float, axis
 
 # ===== USER INTERFACE STUFF =====
 def start_ui():
-    return
+    from PyQt5 import QtWidgets
+    from propeller_design_tools.user_interface import InterfaceMainWindow
+    app = QtWidgets.QApplication(sys.argv)
+    w = InterfaceMainWindow()
+    w.show()
+    app.exec_()
 
 
 def delete_all_widgets_from_layout(layout):

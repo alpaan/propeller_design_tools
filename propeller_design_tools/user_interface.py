@@ -88,17 +88,17 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.prop_db_select_widg.currentDatabaseChanged.connect(self.repop_select_prop_cb)
 
 
-    def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
-        fpaths = _get_gunshot_fpaths()
-        num = int(np.random.rand() * 3.4)
-
-        url = QtCore.QUrl.fromLocalFile(fpaths[num])
-        content = QtMultimedia.QMediaContent(url)
-        player = QtMultimedia.QMediaPlayer(self)
-        player.setMedia(content)
-        player.setVolume(20)
-        player.play()
-        app.exec()
+    # def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
+    #     fpaths = _get_gunshot_fpaths()
+    #     num = int(np.random.rand() * 3.4)
+    #
+    #     url = QtCore.QUrl.fromLocalFile(fpaths[num])
+    #     content = QtMultimedia.QMediaContent(url)
+    #     player = QtMultimedia.QMediaPlayer(self)
+    #     player.setMedia(content)
+    #     player.setVolume(20)
+    #     player.play()
+    #     app.exec_()
 
     def repop_select_prop_cb(self):
         self.print('Changing Propeller Database...')

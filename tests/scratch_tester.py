@@ -2,8 +2,10 @@ import sys
 import propeller_design_tools as pdt
 
 
-prop = pdt.Propeller(name='MyPropeller2')
-prop.plot_mpl3d_geometry()
+pdt.start_ui()
+
+# prop = pdt.Propeller(name='MyPropeller2')
+# prop.plot_mpl3d_geometry()
 
 # af = pdt.Airfoil('e855.dat')
 # af.plot_geometry()
