@@ -1,14 +1,15 @@
 import numpy as np
 import os
 from propeller_design_tools.airfoil import Airfoil
-from propeller_design_tools.user_settings import _get_cursor_fpath
+from propeller_design_tools.user_settings import _get_cursor_fpath, _get_gunshot_fpaths
 from propeller_design_tools.funcs import get_all_airfoil_files, get_all_propeller_dirs
 try:
-    from PyQt5 import QtWidgets, QtGui
+    from PyQt5 import QtWidgets, QtGui, QtCore, QtMultimedia
     from propeller_design_tools.helper_ui_classes import Capturing, DatabaseSelectionWidget, SingleAxCanvas, \
         AxesComboBoxWidget, PdtGuiPrinter
-    from propeller_design_tools.foil_ui_classes import ExistingFoilDataWidget, FoilAnalysisWidget, FoilDataPointWidget
-    from propeller_design_tools.prop_ui_classes import PropellerWidget
+    from propeller_design_tools.foil_ui_classes import ExistingFoilDataWidget, FoilAnalysisWidget, AddFoilDataPointWidget
+    from propeller_design_tools.prop_creation_ui_classes import PropellerCreationWidget
+    from propeller_design_tools.prop_sweep_ui_classes import PropellerSweepWidget
     from propeller_design_tools.opt_ui_classes import OptimizationWidget
     from propeller_design_tools.helper_ui_subclasses import PDT_TextEdit, PDT_GroupBox, PDT_Label, PDT_PushButton, \
         PDT_ComboBox, PDT_TabWidget
@@ -46,8 +47,10 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         center_lay.addWidget(tab_widg)
         self.af_widg = FoilAnalysisWidget()
         tab_widg.addTab(self.af_widg, 'Airfoil Analysis'.upper())
-        self.prop_widg = PropellerWidget(main_win=self)
-        tab_widg.addTab(self.prop_widg, 'Propellers'.upper())
+        self.prop_widg = PropellerCreationWidget(main_win=self)
+        tab_widg.addTab(self.prop_widg, 'Propeller Creation'.upper())
+        self.prop_sweep_widg = PropellerSweepWidget()
+        tab_widg.addTab(self.prop_sweep_widg, 'Propeller Analysis'.upper())
         self.opt_widg = OptimizationWidget()
         tab_widg.addTab(self.opt_widg, 'Optimization'.upper())
 
@@ -84,9 +87,23 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
 
         self.prop_db_select_widg.currentDatabaseChanged.connect(self.repop_select_prop_cb)
 
+
+    def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
+        fpaths = _get_gunshot_fpaths()
+        num = int(np.random.rand() * 3.4)
+
+        url = QtCore.QUrl.fromLocalFile(fpaths[num])
+        content = QtMultimedia.QMediaContent(url)
+        player = QtMultimedia.QMediaPlayer(self)
+        player.setMedia(content)
+        player.setVolume(20)
+        player.play()
+        app.exec_()
+
     def repop_select_prop_cb(self):
         self.print('Changing Propeller Database...')
-        self.prop_widg.control_widg.populate_select_prop_cb()
+        # self.prop_widg.control_widg.populate_select_prop_cb()
+        self.prop_widg.plot3d_widg.populate_select_prop_cb()
 
     def repop_select_foil_cb(self):
         self.print('Changing Airfoil Database...')

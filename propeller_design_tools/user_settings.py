@@ -57,6 +57,30 @@ def _get_cursor_fpath():
     return fname
 
 
+def _get_gunshot_1_fpath():
+    fname = pkg_resources.resource_filename(__name__, 'supporting_files/gunshot1.wav')
+    return fname
+
+
+def _get_gunshot_2_fpath():
+    fname = pkg_resources.resource_filename(__name__, 'supporting_files/gunshot2.wav')
+    return fname
+
+
+def _get_gunshot_3_fpath():
+    fname = pkg_resources.resource_filename(__name__, 'supporting_files/gunshot3.wav')
+    return fname
+
+
+def _get_gunshot_4_fpath():
+    fname = pkg_resources.resource_filename(__name__, 'supporting_files/gunshot4.wav')
+    return fname
+
+
+def _get_gunshot_fpaths():
+    return [_get_gunshot_1_fpath(), _get_gunshot_2_fpath(), _get_gunshot_3_fpath(), _get_gunshot_4_fpath()]
+
+
 def _get_settings_fpath():
     pkg_dir = _get_pdt_pkg_dir()
     if os.path.isdir(pkg_dir):

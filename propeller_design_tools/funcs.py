@@ -600,6 +600,10 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
                      design_thrust: float = None, design_power: float = None, n_radial: int = 50,
                      verbose: bool = False, show_station_fit_plots: bool = True, plot_after: bool = True,
                      tmout: int = 30, hide_windows: bool = True, geo_params: dict = {}):
+    # adjust timeout for vrtx
+    if design_vorform == 'vrtx':
+        tmout = 100
+
     # name must be less than 38? characters for XROTOR to be able to save it
     if len(name) > 38:
         raise Error('"name" must be less than 38 characters when creating a propeller, "{}" is too long'.format(name))

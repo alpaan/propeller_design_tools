@@ -9,6 +9,56 @@ except:
     pass
 
 
+class FoilAnalysisWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super(FoilAnalysisWidget, self).__init__()
+
+        # airfoil group
+        af_lay = QtWidgets.QHBoxLayout()
+        self.setLayout(af_lay)
+        af_left_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_left_lay)
+        af_center_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_center_lay)
+        af_right_lay = QtWidgets.QVBoxLayout()
+        af_lay.addLayout(af_right_lay)
+
+        # airfoil left
+        af_left_lay.addStretch()
+        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
+        self.exist_data_widg.setEnabled(False)
+        af_left_lay.addWidget(self.exist_data_widg)
+        af_left_lay.addStretch()
+        self.add_foil_data_widg = AddFoilDataPointWidget(main_win=self)
+        af_left_lay.addWidget(self.add_foil_data_widg)
+        af_left_lay.addStretch()
+
+        # airfoil center
+        af_center_top_lay = QtWidgets.QFormLayout()
+        af_center_lay.addStretch()
+        af_center_lay.addLayout(af_center_top_lay)
+        self.select_foil_cb = PDT_ComboBox(width=150)
+        self.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
+        af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14, bold=True), self.select_foil_cb)
+        self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
+        af_center_lay.addWidget(self.foil_xy_canvas)
+
+        # airfoil right
+        af_right_top_lay = QtWidgets.QHBoxLayout()
+        af_right_lay.addLayout(af_right_top_lay)
+        metrics_strs = ['alpha', 'CL', 'CD', 'CDp', 'CM', 'Top_Xtr', 'Bot_Xtr', 'CL/CD']
+        ax_cb_widg = AxesComboBoxWidget(x_txts=['x-axis'] + metrics_strs, y_txts=['y-axis'] + metrics_strs,
+                                        init_xtxt='CD', init_ytxt='CL')
+        self.af_yax_cb, self.af_xax_cb = ax_cb_widg.yax_cb, ax_cb_widg.xax_cb
+        af_right_top_lay.addStretch()
+        af_right_top_lay.addWidget(PDT_Label('Plot Metric:', font_size=14, bold=True))
+        af_right_top_lay.addWidget(ax_cb_widg)
+        af_right_top_lay.addStretch()
+
+        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=5.5)
+        af_right_lay.addWidget(self.foil_metric_canvas)
+
+
 class ExistingFoilDataWidget(QtWidgets.QWidget):
     def __init__(self, main_win: 'InterfaceMainWindow'):
         super(ExistingFoilDataWidget, self).__init__()
@@ -17,7 +67,7 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
         lay = QtWidgets.QVBoxLayout()
         self.setLayout(lay)
 
-        title_lbl = PDT_Label('Existing Data (plot controls)', font_size=14)
+        title_lbl = PDT_Label('Existing Data (plot controls)', font_size=14, bold=True)
         lay.addWidget(title_lbl)
         btm_lay = QtWidgets.QHBoxLayout()
         lay.addLayout(btm_lay)
@@ -76,16 +126,17 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
         self.ncrit_lay.addWidget(self.all_ncrit_chk)
 
 
-class FoilDataPointWidget(QtWidgets.QWidget):
+class AddFoilDataPointWidget(QtWidgets.QWidget):
     def __init__(self, main_win: 'InterfaceMainWindow'):
-        super(FoilDataPointWidget, self).__init__()
+        super(AddFoilDataPointWidget, self).__init__()
         self.main_win = main_win
 
         lay = QtWidgets.QFormLayout()
         self.setLayout(lay)
 
         overwrite_chk = PDT_CheckBox('Overwrite Existing Data?', font_size=11)
-        lay.addRow(PDT_Label('Add\nDatapoints\nBy Range:', font_size=14), overwrite_chk)
+        overwrite_chk.setEnabled(False)
+        lay.addRow(PDT_Label('Add\nDatapoints\nBy Range:', font_size=14, bold=True), overwrite_chk)
         lay.setAlignment(overwrite_chk, QtCore.Qt.AlignBottom)
         self.re_rle = RangeLineEditWidget(box_range=[1e4, 1e9], default_strs=['1e6', '1e7', '3e6'],
                                           spin_double_science='science')
@@ -97,8 +148,8 @@ class FoilDataPointWidget(QtWidgets.QWidget):
         lay.addRow(PDT_Label('Mach:', font_size=12), self.mach_rle)
         lay.addRow(PDT_Label('Ncrit:', font_size=12), self.ncrit_rle)
 
-        self.add_btn = PDT_PushButton('Add Data', font_size=12, width=110)
-        self.reset_btn = PDT_PushButton('Reset Ranges', font_size=12, width=130)
+        self.add_btn = PDT_PushButton('Add Data', font_size=12, width=110, bold=True)
+        self.reset_btn = PDT_PushButton('Reset Ranges', font_size=12, width=130, bold=True)
         btn_lay = QtWidgets.QHBoxLayout()
         btn_lay.addStretch()
         btn_lay.addWidget(self.add_btn)
@@ -121,47 +172,3 @@ class FoilDataPointWidget(QtWidgets.QWidget):
 
     def get_ncrit_range(self):
         return self.ncrit_rle.get_start_stop_step()
-
-
-class FoilAnalysisWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super(FoilAnalysisWidget, self).__init__()
-
-        # airfoil group
-        af_lay = QtWidgets.QHBoxLayout()
-        self.setLayout(af_lay)
-        af_left_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_left_lay)
-        af_center_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_center_lay)
-        af_right_lay = QtWidgets.QVBoxLayout()
-        af_lay.addLayout(af_right_lay)
-
-        # airfoil left
-        af_left_lay.addStretch()
-        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
-        af_left_lay.addWidget(self.exist_data_widg)
-        af_left_lay.addStretch()
-        self.add_foil_data_widg = FoilDataPointWidget(main_win=self)
-        af_left_lay.addWidget(self.add_foil_data_widg)
-        af_left_lay.addStretch()
-
-        # airfoil center
-        af_center_top_lay = QtWidgets.QFormLayout()
-        af_center_lay.addLayout(af_center_top_lay)
-        self.select_foil_cb = PDT_ComboBox(width=150)
-        self.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
-        af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14), self.select_foil_cb)
-        self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
-        af_center_lay.addWidget(self.foil_xy_canvas)
-
-        # airfoil right
-        af_right_top_lay = QtWidgets.QFormLayout()
-        af_right_lay.addLayout(af_right_top_lay)
-        metrics_strs = ['alpha', 'CL', 'CD', 'CDp', 'CM', 'Top_Xtr', 'Bot_Xtr', 'CL/CD']
-        ax_cb_widg = AxesComboBoxWidget(x_txts=['x-axis'] + metrics_strs, y_txts=['y-axis'] + metrics_strs,
-                                        init_xtxt='CD', init_ytxt='CL')
-        self.af_yax_cb, self.af_xax_cb = ax_cb_widg.yax_cb, ax_cb_widg.xax_cb
-        af_right_top_lay.addRow(PDT_Label('Plot Metric:', font_size=14), ax_cb_widg)
-        self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=5.5)
-        af_right_lay.addWidget(self.foil_metric_canvas)

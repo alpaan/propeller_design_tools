@@ -72,8 +72,15 @@ Example Scripts / Workflow
 At a high-level, the current concept for PDT workflow is as 
 follows (after obtaining the required executables and pip-installing 
 the PDT package):
+0. Try out the (currently extremely buggy and incomplete) user interface!
+[example0_user_interface.py](
+   https://github.com/helloDestroyerOfWorlds/propeller_design_tools/blob/master/tests/example1_airfoil_analysis.py
+   )
 
-1. Obtain normalized airfoil coordinate files from
+   ![ex0-1.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex0-1.png)
+   ![ex0-2.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex0-2.png)
+
+2. Obtain normalized airfoil coordinate files from
 [UIUC Database](https://m-selig.ae.illinois.edu/ads/coord_database.html)
 -> save these files into the "airfoil_database" directory
 
@@ -106,6 +113,12 @@ the builtin PDT propeller creation function -> see
    )
 
    ![ex3-1.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex3-1.png)
+
+   NOTE: It is highly recommended to first run XROTOR using either the 'grad' 
+or the 'pot' vortex formulation in order to get your design "tweaked in" -> 
+these are much faster than the (more accurate) 'vrtx' formulation, which you 
+can then move on to.
+
    ![ex3-2.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex3-2.png)
 
 

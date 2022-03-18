@@ -5,9 +5,9 @@ except:
     pass
 
 
-class OptimizationWidget(QtWidgets.QWidget):
+class PropellerSweepWidget(QtWidgets.QWidget):
     def __init__(self):
-        super(OptimizationWidget, self).__init__()
+        super(PropellerSweepWidget, self).__init__()
         main_lay = QtWidgets.QHBoxLayout()
         self.setLayout(main_lay)
 
