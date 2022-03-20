@@ -44,14 +44,6 @@ def get_setting(s: str):
         return _get_user_settings()[s]
 
 
-def _get_env_dir():
-    return os.path.split(os.path.split(sys.executable)[0])[0]
-
-
-def _get_pdt_pkg_dir():
-    return os.path.join(_get_env_dir(), 'Lib', 'site-packages', 'propeller_design_tools')
-
-
 def _get_cursor_fpath():
     fname = pkg_resources.resource_filename(__name__, 'supporting_files/crosshair_cursor.png')
     return fname
@@ -82,24 +74,30 @@ def _get_gunshot_fpaths():
 
 
 def _get_settings_fpath():
-    pkg_dir = _get_pdt_pkg_dir()
-    if os.path.isdir(pkg_dir):
-        return os.path.join(pkg_dir, 'user-settings.txt')
-    else:
-        return os.path.join(os.path.split(_get_env_dir())[0], 'user-settings.txt')
+    fname = pkg_resources.resource_filename(__name__, 'supporting_files/user-settings.txt')
+    return fname
 
 
-def _save_settings(new_sett: dict = None, savepath: str = None):
+def _get_default_propeller_database():
+    fname = pkg_resources.resource_filename(__name__, 'prop_database')
+    return fname
+
+
+def _get_default_airfoil_database():
+    fname = pkg_resources.resource_filename(__name__, 'foil_database')
+    return fname
+
+
+def _save_settings(new_sett: dict = None):
     defaults = {
-        'airfoil_database': None,
-        'propeller_database': None
+        'airfoil_database': _get_default_airfoil_database(),
+        'propeller_database': _get_default_propeller_database(),
     }
 
     if new_sett is None:
         new_sett = {}
 
-    if savepath is None:
-        savepath = _get_settings_fpath()
+    savepath = _get_settings_fpath()
 
     if os.path.exists(savepath):
         old_sett = _get_user_settings(settings_path=savepath)

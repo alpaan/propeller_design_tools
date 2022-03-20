@@ -23,8 +23,13 @@ class Propeller(object):
         # name is always given
         self.name = name.replace('.txt', '')
 
+        # check if the prop db exists
+        prop_db = get_setting('propeller_database')
+        if prop_db is None:
+            raise Error(s='No Propeller Database is set!  First set one with "pdt.set_propeller_database(str)".')
+
         # set the save folder attr
-        self.save_folder = os.path.join(get_setting('propeller_database'), self.name)
+        self.save_folder = os.path.join(prop_db, self.name)
         self.meta_file = os.path.join(self.save_folder, '{}.meta'.format(self.name))
         self.xrr_file = os.path.join(self.save_folder, '{}.xrr'.format(self.name))
         self.xrop_file = os.path.join(self.save_folder, '{}.xrop'.format(self.name))
@@ -234,7 +239,7 @@ class Propeller(object):
         return
 
     def save_meta_file(self):
-        attrs_2_ignore = ['blade_xyz_profiles']
+        attrs_2_ignore = ['blade_xyz_profiles', 'meta_file', 'xrr_file', 'xrop_file']   # ignore the files so that prop_dirs can be switched
 
         if os.path.exists(self.meta_file):
             os.remove(self.meta_file)
@@ -305,6 +310,15 @@ class Propeller(object):
                 for xp, yp, zp in zip(xpts, ypts, zpts):
                     f.write('{:.6f}, {:.6f}, {:.6f}\n'.format(xp, yp, zp))
 
+    def get_xrotor_output_text(self):
+        line_num = 0
+        txt = ''
+        with open(self.xrop_file, 'r') as f:
+            while line_num < 16:
+                txt += f.readline()
+                line_num += 1
+        return txt
+
     def plot_design_point_panel(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
                                 input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False,
                                 fig=None):
@@ -332,7 +346,7 @@ class Propeller(object):
                     ax.set_xlabel('r/R')
                 if p == '':
                     ax.set_visible(False)
-        else:  # fig is not None -> we were passed a Figure object from a ui class
+        else:  # fig is not None -> we were passed a Figure object from a UI class
             ax3d = fig.axes[0]
             txt_ax = fig.axes[1]
             radial_axes = {'': fig.axes[2], 'c/R': fig.axes[3], 'beta(deg)': fig.axes[4], 'CL': fig.axes[5], 'CD': fig.axes[6],
@@ -433,13 +447,7 @@ class Propeller(object):
             ax3d.legend(leg_handles, leg_labels, loc='upper left', bbox_to_anchor=(1.05, 1.0))
 
         def do_txt_ax():
-            line_num = 0
-            txt = ''
-            with open(self.xrop_file, 'r') as f:
-                while line_num < 16:
-                    txt += f.readline()
-                    line_num += 1
-            txt_ax.text(x=0.0, y=0.5, s=txt, ha='left', va='center', fontfamily='consolas')
+            txt_ax.text(x=0.0, y=0.5, s=self.get_xrotor_output_text(), ha='left', va='center', fontfamily='consolas')
             txt_ax.axis('off')
 
         def do_radial_axes():
@@ -486,7 +494,7 @@ class Propeller(object):
             ax3d = fig.axes[0]
             leg_anchor = (-0.15, 1.0)
         else:
-            fig = plt.figure(figsize=[8, 6])
+            fig = plt.figure(figsize=[13, 10])
             ax3d = fig.add_subplot(111, projection='3d')
             leg_anchor = (0.90, 1.0)
 

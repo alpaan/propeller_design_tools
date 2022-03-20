@@ -205,8 +205,8 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
     def reset_foil_ranges_btn_clicked(self):
         self.af_widg.add_foil_data_widg.reset_ranges()
 
-    def print(self, s: str):
-        self.printer.print(s)
+    def print(self, s: str, fontfamily: str = None):
+        self.printer.print(s, fontfamily=fontfamily)
 
 
 if __name__ == '__main__':

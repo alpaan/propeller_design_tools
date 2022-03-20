@@ -32,6 +32,10 @@ class SingleAxCanvas(FigureCanvasQTAgg):
 
         super(SingleAxCanvas, self).__init__(fig)
 
+    def clear_axes(self):
+        self.axes.clear()
+        self.draw()
+
 
 class PropellerCreationPanelCanvas(FigureCanvasQTAgg):
     def __init__(self, *args, **kwargs):
@@ -83,8 +87,12 @@ class PdtGuiPrinter:
     def __init__(self, console_te: PDT_TextEdit):
         self.console_te = console_te
 
-    def print(self, s: str):
+    def print(self, s: str, fontfamily: str = None):
+        old_ff = self.console_te.fontFamily()
+        if fontfamily is not None:
+            self.console_te.setFontFamily(fontfamily)
         self.console_te.append('PDT GUI:  {}'.format(s))
+        self.console_te.setFontFamily(old_ff)
 
 
 class DatabaseSelectionWidget(QtWidgets.QWidget):

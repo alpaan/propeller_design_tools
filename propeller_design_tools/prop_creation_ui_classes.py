@@ -1,5 +1,6 @@
 from propeller_design_tools.propeller import Propeller
 from propeller_design_tools.funcs import get_all_propeller_dirs
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 try:
     from PyQt5 import QtWidgets, QtCore
     from propeller_design_tools.helper_ui_classes import SingleAxCanvas, Capturing, AxesComboBoxWidget, \
@@ -43,6 +44,8 @@ class PropellerCreationWidget(QtWidgets.QWidget):
             self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
             self.plot3d_widg.update_plot(self.prop)
         self.metric_plot_widget.update_data()
+        self.main_win.print('XROTOR OUTPUT:')
+        self.main_win.print(self.prop.get_xrotor_output_text(), fontfamily='consolas')
 
 
 class PropellerCreationControlWidget(QtWidgets.QWidget):
@@ -191,23 +194,30 @@ class PropellerCreationMetricPlotWidget(QtWidgets.QWidget):
         self.plot_canvas = SingleAxCanvas(self, width=4.5, height=5)
         self.axes = self.plot_canvas.axes
         main_lay.addWidget(self.plot_canvas)
+        toolbar = NavigationToolbar(self.plot_canvas, self)
+        main_lay.addWidget(toolbar)
+        main_lay.addStretch()
 
     def update_data(self):
-        self.plot_canvas.axes.clear()
+        self.plot_canvas.clear_axes()
+
         yax_txt = self.yax_cb.currentText()
         xax_txt = self.xax_cb.currentText()
-        if yax_txt != 'y-axis' and xax_txt != 'x-axis':
-            prop = self.main_win.prop_widg.prop
-            if prop is not None:
-                self.axes.set_xlabel(xax_txt)
-                self.axes.set_ylabel(yax_txt)
-                self.axes.grid(True)
-                xdata = prop.xrotor_op_dict[xax_txt]
-                if yax_txt in prop.blade_data:
-                    self.axes.plot(xdata, prop.blade_data[yax_txt], marker='*', markersize=4)
-                else:
-                    if yax_txt in prop.xrotor_op_dict:
-                        self.axes.plot(xdata, prop.xrotor_op_dict[yax_txt], marker='o', markersize=3)
+        if yax_txt == 'y-axis' or xax_txt == 'x-axis':
+            return
+        prop = self.main_win.prop_widg.prop
+        if prop is None:
+            return
+
+        self.axes.set_xlabel(xax_txt)
+        self.axes.set_ylabel(yax_txt)
+        self.axes.grid(True)
+        xdata = prop.xrotor_op_dict[xax_txt]
+        if yax_txt in prop.blade_data:
+            self.axes.plot(xdata, prop.blade_data[yax_txt], marker='*', markersize=4)
+        else:
+            if yax_txt in prop.xrotor_op_dict:
+                self.axes.plot(xdata, prop.xrotor_op_dict[yax_txt], marker='o', markersize=3)
 
         self.plot_canvas.draw()
 

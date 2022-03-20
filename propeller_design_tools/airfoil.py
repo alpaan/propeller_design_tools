@@ -2,7 +2,7 @@ import os
 import warnings
 from propeller_design_tools import funcs
 from propeller_design_tools.user_io import Error, Info, Warning
-from propeller_design_tools.user_settings import _get_user_settings
+from propeller_design_tools.user_settings import get_foil_db
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
@@ -23,11 +23,16 @@ class Airfoil(object):
         else:
             self.name = name_in
 
+        # check for foil database existence
+        if get_foil_db() is None:
+            raise Error('No airfoil database set -> use "pdt.set_airfoil_database(str)" to set one.')
+
+        # get the airfoil filename, filepath
         fname = funcs.get_airfoil_file_from_db(self.name, exact_namematch=exact_namematch)
         if verbose:
             Info('Found airfoil coordinate file: {}'.format(fname))
+        self.coord_fpath = os.path.join(get_foil_db(), fname)
 
-        self.coord_fpath = os.path.join(_get_user_settings()['airfoil_database'], fname)
         name, x_coords, y_coords = funcs.read_airfoil_coordinate_file(fpath=self.coord_fpath, verbose=verbose)
         self.filename = os.path.basename(self.coord_fpath)
         self.x_coords = np.array(x_coords)
@@ -46,13 +51,13 @@ class Airfoil(object):
         return '/'.join([dr.split('\\')[-1], fname])
 
     def get_database_savepath(self):
-        database_folder = os.path.join(_get_user_settings()['airfoil_database'], 'polar_database')
+        database_folder = os.path.join(get_foil_db(), 'polar_database')
         savename, _ = os.path.splitext(os.path.basename(self.coord_fpath))
         savepath = os.path.join('{}'.format(database_folder), '{}_polar_data.txt'.format(savename))
         return savepath
 
     def write_xfoil_coord_file(self):
-        xfoil_folder = os.path.join(_get_user_settings()['airfoil_database'], 'for_xfoil')
+        xfoil_folder = os.path.join(get_foil_db(), 'for_xfoil')
         if not os.path.exists(xfoil_folder):
             os.mkdir(xfoil_folder)
 
@@ -270,7 +275,7 @@ class Airfoil(object):
             return
 
         # save/append to database, start by making folder if it doesn't already exist
-        database_folder = os.path.join(_get_user_settings()['airfoil_database'], 'polar_database')
+        database_folder = os.path.join(get_foil_db(), 'polar_database')
         if not os.path.exists(database_folder):
             os.mkdir(database_folder)
             if verbose:

@@ -7,7 +7,7 @@ pdt.start_ui()
 # prop.plot_design_point_panel()
 # prop.plot_mpl3d_geometry()
 
-# af = pdt.Airfoil('clarky.dat')
+# af = pdt.Airfoil('arad13.dat')
 # af.plot_polar_data(x_param='CD', y_param='CL')
 # af.calculate_xfoil_polars(re=[7e4], ncrit=[9], mach=[0])
 
