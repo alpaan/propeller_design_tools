@@ -322,8 +322,8 @@ class Propeller(object):
     def plot_design_point_panel(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
                                 input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False,
                                 fig=None):
-
         if fig is None:
+            created_from_ui = False
             radial_axes = {'': None, 'c/R': None, 'beta(deg)': None, 'CL': None, 'CD': None,
                            'thrust_eff': None, 'RE': None, 'Mach': None, 'effi': None, 'effp': None,
                            'GAM': None, 'Ttot': None, 'Ptot': None, 'VA/V': None, 'VT/V': None}
@@ -347,6 +347,7 @@ class Propeller(object):
                 if p == '':
                     ax.set_visible(False)
         else:  # fig is not None -> we were passed a Figure object from a UI class
+            created_from_ui = True
             ax3d = fig.axes[0]
             txt_ax = fig.axes[1]
             radial_axes = {'': fig.axes[2], 'c/R': fig.axes[3], 'beta(deg)': fig.axes[4], 'CL': fig.axes[5], 'CD': fig.axes[6],
@@ -479,7 +480,8 @@ class Propeller(object):
         do_txt_ax()
         do_radial_axes()
         do_thrust_eff_ax()
-        fig.subplots_adjust(left=0.05, bottom=0.08, right=0.95, top=0.94, wspace=0.35, hspace=0.5)
+        wsp = 0.60 if created_from_ui else 0.35
+        fig.subplots_adjust(left=0.05, bottom=0.08, right=0.95, top=0.94, wspace=wsp, hspace=0.5)
 
         if savefig:
             savepath = os.path.join(os.getcwd(), '{}.png'.format(ax3d.get_title()))

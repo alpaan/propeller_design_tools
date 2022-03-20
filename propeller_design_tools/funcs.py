@@ -864,7 +864,7 @@ def xrotor_drag_model(CL: np.ndarray, CDmin: float, CLCDmin: float, dCDdCL2: flo
     return CD
 
 
-def get_xrotor_re_scaling_exp(re: int):
+def get_xrotor_re_scaling_exp(re: int):     # THIS NEEDS WORK
     re_pts = [0, 1e5, 2e5, 8e5, 2e6, 3e6]
     f_pts = [-0.3, -0.5, -0.5, -1.5, -0.2, -0.1]
     return np.interp(x=re, xp=re_pts, fp=f_pts)

@@ -56,6 +56,7 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
 
         form_lay2a = QtWidgets.QFormLayout()
         form_lay2b = QtWidgets.QFormLayout()
+        form_lay2c = QtWidgets.QFormLayout()
         form_lay3 = QtWidgets.QFormLayout()
         form_lay4 = QtWidgets.QFormLayout()
         main_lay.addStretch()
@@ -66,6 +67,8 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         layla_oh_layla.addStretch()
 
         main_lay.addLayout(layla_oh_layla)
+        main_lay.addStretch()
+        main_lay.addLayout(form_lay2c)
         main_lay.addStretch()
         main_lay.addLayout(form_lay3)
         main_lay.addStretch()
@@ -102,13 +105,13 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
 
         # atmo props, vorform, station params
         self.atmo_props_widg = AtmoPropsInputWidget()
-        form_lay2a.addRow(PDT_Label('Atmosphere\nProperties->', font_size=12), self.atmo_props_widg)
+        form_lay2c.addRow(PDT_Label('Atmosphere\nProperties->', font_size=12), self.atmo_props_widg)
         self.vorform_cb = PDT_ComboBox(width=100)
         self.vorform_cb.addItems(['grad', 'pot', 'vrtx'])
-        form_lay2a.addRow(PDT_Label('Vortex\nFormulation:', font_size=12), self.vorform_cb)
-        form_lay2a.setAlignment(self.vorform_cb, QtCore.Qt.AlignBottom)
+        form_lay2c.addRow(PDT_Label('Vortex\nFormulation:', font_size=12), self.vorform_cb)
+        form_lay2c.setAlignment(self.vorform_cb, QtCore.Qt.AlignBottom)
         self.station_params_widg = StationParamsWidget()
-        form_lay2a.addRow(PDT_Label('Station\nParameters->', font_size=12), self.station_params_widg)
+        form_lay2c.addRow(PDT_Label('Station\nParameters->', font_size=12), self.station_params_widg)
 
 
         # extra geo params
@@ -196,6 +199,7 @@ class PropellerCreationMetricPlotWidget(QtWidgets.QWidget):
         main_lay.addWidget(self.plot_canvas)
         toolbar = NavigationToolbar(self.plot_canvas, self)
         main_lay.addWidget(toolbar)
+        main_lay.setAlignment(toolbar, QtCore.Qt.AlignHCenter)
         main_lay.addStretch()
 
     def update_data(self):
@@ -301,12 +305,12 @@ class AtmoPropsInputWidget(QtWidgets.QWidget):
         lay.addLayout(right_lay)
         lay.addStretch()
 
-        self.altitude_sb = PDT_DoubleSpinBox()
+        self.altitude_sb = PDT_DoubleSpinBox(width=60)
         left_center_lay.addRow(PDT_Label('Altitude:', font_size=12), self.altitude_sb)
 
-        self.rho_sb = PDT_DoubleSpinBox()
+        self.rho_sb = PDT_DoubleSpinBox(width=60)
         right_lay.addRow(PDT_Label('Rho:', font_size=12), self.rho_sb)
-        self.nu_sb = PDT_DoubleSpinBox()
+        self.nu_sb = PDT_DoubleSpinBox(width=60)
         right_lay.addRow(PDT_Label('Nu:', font_size=12), self.nu_sb)
-        self.temp_sb = PDT_DoubleSpinBox()
-        right_lay.addRow(PDT_Label('Temp:', font_size=12), self.temp_sb)
+        self.vsou_sb = PDT_DoubleSpinBox(width=60)
+        right_lay.addRow(PDT_Label('Vsou:', font_size=12), self.vsou_sb)

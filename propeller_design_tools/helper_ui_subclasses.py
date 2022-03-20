@@ -40,6 +40,7 @@ class PDT_Label(QtWidgets.QLabel):
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
+        word_wrap = kwargs.pop('word_wrap') if 'word_wrap' in kwargs else False
 
         super(PDT_Label, self).__init__(*args, **kwargs)
 
@@ -47,6 +48,7 @@ class PDT_Label(QtWidgets.QLabel):
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
         self.set_width(width=width)
+        self.setWordWrap(word_wrap)
 
     def set_italic(self, italic: bool):
         font = self.font()

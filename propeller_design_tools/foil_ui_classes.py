@@ -1,5 +1,6 @@
 from propeller_design_tools.funcs import delete_all_widgets_from_layout, get_all_airfoil_files
 from propeller_design_tools.airfoil import Airfoil
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 try:
     from PyQt5 import QtWidgets, QtCore
     from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_GroupBox, PDT_PushButton, PDT_ComboBox, \
@@ -42,6 +43,9 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
         af_center_top_lay.addRow(PDT_Label('Select Foil:', font_size=14, bold=True), self.select_foil_cb)
         self.foil_xy_canvas = SingleAxCanvas(self, width=4, height=4)
         af_center_lay.addWidget(self.foil_xy_canvas)
+        self.foil_xy_navbar = NavigationToolbar(self.foil_xy_canvas, self)
+        af_center_lay.addWidget(self.foil_xy_navbar)
+        af_center_lay.setAlignment(self.foil_xy_navbar, QtCore.Qt.AlignHCenter)
 
         # airfoil right
         af_right_top_lay = QtWidgets.QHBoxLayout()
@@ -57,6 +61,12 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
 
         self.foil_metric_canvas = SingleAxCanvas(self, width=8, height=5.5)
         af_right_lay.addWidget(self.foil_metric_canvas)
+        self.metric_navbar = NavigationToolbar(self.foil_metric_canvas, self)
+        metric_nav_layout = QtWidgets.QHBoxLayout()
+        metric_nav_layout.addStretch()
+        metric_nav_layout.addWidget(self.metric_navbar)
+        metric_nav_layout.addStretch()
+        af_right_lay.addLayout(metric_nav_layout)
 
 
 class ExistingFoilDataWidget(QtWidgets.QWidget):

@@ -127,7 +127,7 @@ class Airfoil(object):
             A0deg = a_low + dcl * da_dcl
             return A0deg
 
-        def find_stall_angle(start_a: float = 5, ainc: float = .5, max_a: float = 25, press_iter: int = 10,
+        def find_stall_angle(start_a: float = 5, ainc: float = 1.0, max_a: float = 25, press_iter: int = 5,
                              dclda_threshold: float = 0.0):   # function to find stall angle
             this_a = start_a - ainc         # initializing
             this_cl = 0.0                   # initializing
@@ -169,7 +169,7 @@ class Airfoil(object):
         if verbose:
             Info('Found alpha_CL0 = {}'.format(zero_lift_aoa), indent_level=1)
             Info('Approximating stall angle...', indent_level=1)
-        a_stall = find_stall_angle()
+        a_stall = find_stall_angle(start_a=zero_lift_aoa + 12)
         if verbose:
             Info('Found a_stall = {}'.format(a_stall), indent_level=1)
         alpha = np.arange(zero_lift_aoa - 1, a_stall + 2.5, 0.5)

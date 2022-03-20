@@ -37,8 +37,12 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         # the main groups
         top_lay = QtWidgets.QHBoxLayout()
         sett_grp = PDT_GroupBox('Settings'.upper(), italic=True, font_size=16)
+        sett_grp.setFixedHeight(250)
+        # sett_grp.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         top_lay.addWidget(sett_grp)
         console_grp = PDT_GroupBox('Console Output'.upper(), italic=True, font_size=16)
+        console_grp.setFixedHeight(250)
+        # console_grp.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         top_lay.addWidget(console_grp)
         center_lay.addLayout(top_lay)
 
@@ -136,6 +140,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
             self.af_widg.foil_metric_canvas.draw()
 
     def clear_console_btn_clicked(self):
+        self.prog_bar.setValue(0)
         self.console_te.clear()
 
     def select_foil_cb_changed(self, foil_txt):

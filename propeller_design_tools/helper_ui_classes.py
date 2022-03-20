@@ -40,7 +40,7 @@ class SingleAxCanvas(FigureCanvasQTAgg):
 
 class PropellerCreationPanelCanvas(FigureCanvasQTAgg):
     def __init__(self, *args, **kwargs):
-        width = kwargs.pop('width') if 'width' in kwargs else 18
+        width = kwargs.pop('width') if 'width' in kwargs else 19
         height = kwargs.pop('height') if 'height' in kwargs else 10
         dpi = kwargs.pop('dpi') if 'dpi' in kwargs else 100
 
@@ -111,7 +111,7 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         lay = QtWidgets.QHBoxLayout()
         self.setLayout(lay)
 
-        self.current_db_lbl = PDT_Label('', font_size=11)
+        self.current_db_lbl = PDT_Label('', font_size=11, word_wrap=True, width=500)
         lay.addWidget(self.current_db_lbl)
 
         set_btn = PDT_PushButton('...', width=50, font_size=11)
