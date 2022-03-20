@@ -1,7 +1,8 @@
 import os
 import numpy as np
 import matplotlib.gridspec as gridspec
-from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database
+from propeller_design_tools.user_settings import get_setting, set_propeller_database, set_airfoil_database, \
+    get_foil_db, get_prop_db
 from propeller_design_tools.funcs import count_airfoil_db, count_propeller_db
 from propeller_design_tools.propeller import Propeller
 import sys
@@ -132,7 +133,10 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         return '{} {}(s) found!'.format(self.found_files, self.db_type)
 
     def get_existing_setting(self):
-        return get_setting(s='{}_database'.format(self.db_type))
+        if self.db_type == 'airfoil':
+            return get_foil_db()
+        else:  # self.db_type == 'propeller'
+            return get_prop_db()
 
     def set_current_db(self, db_dir: str = None):
         if db_dir is None:

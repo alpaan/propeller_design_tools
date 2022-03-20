@@ -43,9 +43,9 @@ class PropellerCreationWidget(QtWidgets.QWidget):
                 self.prop = Propeller(name=curr_txt)
             self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
             self.plot3d_widg.update_plot(self.prop)
+            self.main_win.print('XROTOR OUTPUT:')
+            self.main_win.print(self.prop.get_xrotor_output_text(), fontfamily='consolas')
         self.metric_plot_widget.update_data()
-        self.main_win.print('XROTOR OUTPUT:')
-        self.main_win.print(self.prop.get_xrotor_output_text(), fontfamily='consolas')
 
 
 class PropellerCreationControlWidget(QtWidgets.QWidget):

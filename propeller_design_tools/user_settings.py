@@ -5,21 +5,6 @@ import pkg_resources
 
 
 def set_airfoil_database(path: str):
-    if not os.path.exists(path):
-        yes_or_no = Input('Specified airfoil database directory does not yet exist, would you like PDT to create it? '
-                          '(Y/N)').response
-
-        make = False
-        if len(yes_or_no) == 1:
-            if 'y' in yes_or_no.lower():
-                make = True
-        else:
-            if 'yes' in yes_or_no.lower():
-                make = True
-        if make:
-            os.mkdir(path)
-            Info(s='Created directory "{}"'.format(path), indent_level=1)
-
     _save_settings({'airfoil_database': path})
     return
 
@@ -30,11 +15,27 @@ def set_propeller_database(path: str):
 
 
 def get_prop_db():
-    return _get_user_settings()['propeller_database']
+    usr_db = _get_user_settings()['propeller_database']
+    if os.path.isdir(usr_db):
+        return usr_db
+    else:
+        def_db = _get_default_propeller_database()
+        if os.path.isdir(def_db):
+            return def_db
+        else:
+            raise Error('Cannot find either propeller database option (user-set = "{}", default = "{}")'.format(usr_db, def_db))
 
 
 def get_foil_db():
-    return _get_user_settings()['airfoil_database']
+    usr_db = _get_user_settings()['airfoil_database']
+    if os.path.isdir(usr_db):
+        return usr_db
+    else:
+        def_db = _get_default_airfoil_database()
+        if os.path.isdir(def_db):
+            return def_db
+        else:
+            raise Error('Cannot find either airfoil database option (user-set = "{}", default = "{}")'.format(usr_db, def_db))
 
 
 def get_setting(s: str):
