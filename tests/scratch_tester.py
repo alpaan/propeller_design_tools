@@ -3,17 +3,13 @@ import propeller_design_tools as pdt
 
 pdt.start_ui()
 
-# prop = pdt.Propeller(name='MyPropeller')
-# prop.plot_design_point_panel()
-# prop.plot_mpl3d_geometry()
+# prop = pdt.Propeller('MyPropeller')
+# oper_data = pdt.propeller.PropellerOperData(directory=r"C:\Users\Jake\Desktop\Python Projects\propeller_design_tools\propeller_design_tools\prop_database\MyPropeller\oper_data")
+# oper_data.load_oper_sweep_results()
+# prop.plot_oper_data(x_param='J', y_param='Efficiency')
+# prop.analyze_sweep(velo_vals=[15, 16, 17], sweep_param='power', sweep_vals=[200, 400, 600, 800, 1000], xrotor_verbose=True)
 
-# af = pdt.Airfoil('arad13.dat')
-# af.plot_polar_data(x_param='CD', y_param='CL')
-# af.calculate_xfoil_polars(re=[7e4], ncrit=[9], mach=[0])
 
-# prop = pdt.Propeller('MyPropeller2')
-# prop.plot_design_point_panel()
-# prop.plot_ideal_eff()
 
 # pdt.create_propeller(
 #     name='MyPropeller2',

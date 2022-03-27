@@ -1,7 +1,7 @@
 import os
 from propeller_design_tools import funcs
 from propeller_design_tools.user_io import Info, Error
-from propeller_design_tools.user_settings import get_setting
+from propeller_design_tools.settings import get_setting
 from propeller_design_tools.airfoil import Airfoil
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -22,6 +22,8 @@ class Propeller(object):
     def __init__(self, name, **kwargs):
         # name is always given
         self.name = name.replace('.txt', '')
+        self.oper_data = None
+        self.wvel_data = None
 
         # check if the prop db exists
         prop_db = get_setting('propeller_database')
@@ -57,6 +59,12 @@ class Propeller(object):
                 else:
                     raise Error('Unknown KWARG input "{}"'.format(key))
 
+        # attempt to load any oper sweep data and any wvel sweep data
+        self.oper_data = PropellerOperData(directory=self.oper_data_dir)
+        self.oper_data.load_oper_sweep_results()
+        self.wvel_data = PropellerWVelData(directory=self.wvel_data_dir)
+        self.wvel_data.load_wvel_sweep_results()
+
     @property
     def design_rho(self):
         if 'dens' in self.design_atmo_props:
@@ -81,6 +89,14 @@ class Propeller(object):
     def disk_loading(self):
         if self.design_thrust is not None and self.disk_area_m_sqrd is not None:
             return self.design_thrust / self.disk_area_m_sqrd
+
+    @property
+    def oper_data_dir(self):
+        return os.path.join(os.path.split(self.meta_file)[0], 'oper_data')
+
+    @property
+    def wvel_data_dir(self):
+        return os.path.join(os.path.split(self.meta_file)[0], 'wvel_data')
 
     def read_pdt_metafile(self):
         # read in the PDT meta-file (in the root propeller database) and set Propeller attrs
@@ -640,3 +656,137 @@ class Propeller(object):
     def plot_ideal_eff(self):
         Info('"{}" ideal efficiency: {:.1f}%'.format(self.name, self.ideal_eff))
         return
+
+    def analyze_operating_point(self, velo: float = None, adva: float = None, rpm: float = None, thrust: float = None,
+                                power: float = None, torque: float = None, xrotor_verbose: bool = False):
+
+        funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=self.design_vorform, adva=adva, rpm=rpm, thrust=thrust,
+                              torque=torque, power=power, velo=velo, xrotor_verbose=xrotor_verbose)
+
+    def analyze_sweep(self, velo_vals: list, sweep_param: str, sweep_vals: list, verbose: bool = True,
+                      xrotor_verbose: bool = False):
+        if sweep_param not in ['adva', 'rpm', 'thrust', 'power', 'torque']:
+            raise Error('"sweep_param" must be one of ("adva", "rpm", "thrust", "power", "torque")')
+
+        total_pnts = len(velo_vals) * len(sweep_vals)
+        if verbose:
+            Info('Analyzing "{}" across a sweep of {} operating points'.format(self.name, total_pnts))
+        count = 0
+        for velo_val in velo_vals:
+            for v, val in enumerate(sweep_vals):
+                count += 1
+                if verbose:
+                    Info('Analyzing sweep point # {} / {}'.format(count, total_pnts))
+                funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=self.design_vorform, velo=velo_val,
+                                      xrotor_verbose=xrotor_verbose, **{sweep_param: val})
+        if verbose:
+            Info('Done!')
+
+    def plot_oper_data(self, x_param: str, y_param: str, **plot_kwargs):
+        valid_x_params = ['adv. ratio', 'J', 'speed(m/s)', 'rpm']
+        valid_y_params = ['thrust(N)', 'power(W)', 'torque(N-m)', 'Efficiency', 'Eff induced',
+                          'Eff ideal', 'Pvisc(W)', 'Ct', 'Tc', 'Cp', 'Pc', 'Sigma']
+
+        if x_param not in valid_x_params:
+            raise Error('x_param "{}" is not one of the valid params ("adv. ratio", "J", "speed(m/s)", "rpm")'.format(x_param))
+        if y_param not in valid_y_params:
+            raise Error('y_param "{}" is not one of the valid params ("thrust(N)", "power(W)", "torque(N-m)", '
+                        '"Efficiency", "Eff induced", "Eff ideal", "Pvisc(W)", "Ct" ,"Tc", "Cp", "Pc", "Sigma")'
+                        .format(y_param))
+
+        fig = plt.figure(figsize=[10, 8])
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        ax.set_title('{} Sweep Results'.format(self.name))
+        ax.set_xlabel(x_param)
+        ax.set_ylabel(y_param)
+
+        if x_param in ['rpm', 'adv. ratio', 'J']:  # families of velo
+            for vel in self.oper_data.get_unique_velos():
+                x_vals, y_vals = [], []
+                for rpm in self.oper_data.get_unique_rpms():
+                    if (vel, rpm) in self.oper_data.datapoints:
+                        datapoint = self.oper_data.datapoints[(vel, rpm)]
+                        x_vals.append(datapoint[x_param])
+                        y_vals.append(datapoint[y_param])
+                        lbl_txt = '{}'.format(vel)
+                ax.plot(x_vals, y_vals, '-o', label=lbl_txt)
+                ax.legend(loc='best', title='Speed(m/s)')
+        else:  # families of rpm
+            for rpm in self.oper_data.get_unique_rpms():
+                x_vals, y_vals = [], []
+                for vel in self.oper_data.get_unique_velos():
+                    if (vel, rpm) in self.oper_data.datapoints:
+                        datapoint = self.oper_data.datapoints[(vel, rpm)]
+                        x_vals.append(datapoint[x_param])
+                        y_vals.append(datapoint[y_param])
+                        lbl_txt = '{}'.format(rpm)
+                ax.plot(x_vals, y_vals, '-o', label=lbl_txt)
+                ax.legend(loc='best', title='RPMs')
+
+
+class PropellerOperData:
+    def __init__(self, directory: str):
+        self.directory = directory
+        self.datapoints = None
+
+    def get_oper_files(self, fullpath: bool = True):
+        if fullpath:
+            return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.oper')]
+        else:
+            return [name for name in os.listdir(self.directory) if name.endswith('.oper')]
+
+    def load_oper_sweep_results(self, verbose: bool = True):
+        self.datapoints = d = {}
+        fnames = self.get_oper_files(fullpath=False)
+        for fname in fnames:
+            vel_key, rpm_key = [float(num) for num in fname.strip('velo_').strip('.oper').split('_rpm_')]
+            vel_key /= 100
+            oper_fullpath = os.path.join(self.directory, fname)
+            d[(vel_key, rpm_key)] = funcs.read_xrotor_op_file(fpath=oper_fullpath)
+        if verbose:
+            Info('Loaded Existing Oper Results (.oper)!', indent_level=1)
+
+    def get_unique_velos(self):
+        uniq_velos = []
+        for key in self.datapoints:
+            if key[0] not in uniq_velos:
+                uniq_velos.append(key[0])
+        return list(sorted(uniq_velos))
+
+    def get_unique_rpms(self):
+        uniq_rpms = []
+        for key in self.datapoints:
+            if key[1] not in uniq_rpms:
+                uniq_rpms.append(key[1])
+        return list(sorted(uniq_rpms))
+
+    def get_unique_advas(self):
+        uniq_advas = []
+        for val in self.datapoints.values():
+            if val['adv. ratio'] not in uniq_advas:
+                uniq_advas.append(val['adv. ratio'])
+        return list(sorted(uniq_advas))
+
+
+class PropellerWVelData:
+    def __init__(self, directory: str):
+        self.directory = directory
+        self.datapoints = None
+
+    def get_wvel_files(self, fullpath: bool = True):
+        if fullpath:
+            return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.wvel')]
+        else:
+            return [name for name in os.listdir(self.directory) if name.endswith('.wvel')]
+
+    def load_wvel_sweep_results(self, verbose: bool = True):
+        self.datapoints = d = {}
+        fnames = self.get_wvel_files(fullpath=False)
+        for fname in fnames:
+            vel_key, rpm_key = [float(num) for num in fname.strip('velo_').strip('.wvel').split('_rpm_')]
+            vel_key /= 100
+            wvel_fullpath = os.path.join(self.directory, fname)
+            d[(vel_key, rpm_key)] = funcs.read_xrotor_wvel_file(fpath=wvel_fullpath)
+        if verbose:
+            Info('Loaded Existing WVel Results (.wvel)!', indent_level=1)

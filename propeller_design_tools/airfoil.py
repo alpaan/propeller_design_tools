@@ -2,7 +2,7 @@ import os
 import warnings
 from propeller_design_tools import funcs
 from propeller_design_tools.user_io import Error, Info, Warning
-from propeller_design_tools.user_settings import get_foil_db
+from propeller_design_tools.settings import get_foil_db
 import matplotlib
 matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt

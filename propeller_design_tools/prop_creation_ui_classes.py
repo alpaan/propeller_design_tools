@@ -124,6 +124,27 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         self.reset_btn = PDT_PushButton('Reset', width=150, font_size=12, bold=True)
         form_lay4.addRow(self.create_btn, self.reset_btn)
 
+    def get_input_vals(self):
+        nblades = self.nblades_sb.value()
+        radius = self.radius_sb.value()
+        hub_radius = self.hub_radius_sb.value()
+        hub_wk_disp_br = self.hub_wake_disp_br_sb.value()
+        speed = self.design_speed_sb.value()
+        adv = self.design_adv_sb.value()
+        rpm = self.design_rpm_sb.value()
+        thrust = self.design_thrust_sb.value()
+        power = self.design_power_sb.value()
+        cl_txt = self.design_cl_le.text()
+        altitude = self.atmo_props_widg.altitude_sb.value()
+        rho = self.atmo_props_widg.rho_sb.value()
+        nu = self.atmo_props_widg.nu_sb.value()
+        vsou = self.atmo_props_widg.vsou_sb.value()
+        vorform = self.vorform_cb.currentText()
+        stations_dict = self.station_params_widg.get_stations()
+        skew = self.skew_sb.value()
+
+        pass
+
 
 class Propeller3dPlotWidget(QtWidgets.QWidget):
     def __init__(self, main_win: 'InterfaceMainWindow'):
@@ -287,6 +308,9 @@ class StationParamsWidget(QtWidgets.QWidget):
     def remove_row(self):
         row = self.rows_lay.rowCount() - 1
         self.rows_lay.removeRow(row)
+
+    def get_stations_dict(self):
+        return {}
 
 
 class AtmoPropsInputWidget(QtWidgets.QWidget):

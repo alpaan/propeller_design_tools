@@ -1,6 +1,6 @@
 try:
     from PyQt5 import QtWidgets, QtGui, QtCore
-    from propeller_design_tools.user_settings import _get_cursor_fpath
+    from propeller_design_tools.settings import _get_cursor_fpath
     from propeller_design_tools.science_spinbox_class import ScientificDoubleSpinBox
 except:
     pass

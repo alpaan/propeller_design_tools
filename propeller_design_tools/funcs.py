@@ -9,7 +9,7 @@ from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.radialstation import RadialStation
 from propeller_design_tools.propeller import Propeller
 from propeller_design_tools.user_io import Info, Error
-from propeller_design_tools.user_settings import _get_user_settings, get_prop_db, get_foil_db
+from propeller_design_tools.settings import _get_user_settings, get_prop_db, get_foil_db
 
 
 # =============== CONVENIENCE / UTILITY FUNCTIONS ===============
@@ -488,7 +488,7 @@ def read_xrotor_op_file(fpath: str):
     for line in lines:
         if line.strip('-').strip('=').strip() == '':
             pass  # ignore blank lines
-        elif ':' in line:
+        elif ':' in line:   # top section
             spl = [l.strip() for l in line.split(':')]
             for i in range(len(spl) - 1):
                 key = spl[i].split('  ')[-1].strip()
@@ -497,7 +497,7 @@ def read_xrotor_op_file(fpath: str):
                     d[key] = float(val)
                 else:
                     d[key] = val
-        else:
+        else:   # listout at bottom
             vals = [val.strip() for val in line.replace('-', ' -').split(' ') if val != '']
             if headers is None:
                 headers = vals.copy()
@@ -556,17 +556,6 @@ def read_profile_xyz(fpath: str):
 
 
 # =============== INTERFACING WITH 3RD PARTY PROGRAMS ===============
-def calc_re(rho: float = None, vel: float = None, chord: float = None, mu: float = None, rpm: float = None,
-            radius: float = None):
-    if all([i is not None for i in [rho, vel, chord, mu]]):
-        re = rho * vel * chord / mu
-    elif all([i is not None for i in [rho, rpm, radius, chord, mu]]):
-        re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
-    else:
-        raise Error('Must input all of either [rho, vel, chord, mu] or [rho, rpm, radius, chord, mu]')
-    return re
-
-
 def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: bool = False):
     # get density for Re estimates
     if prop.design_atmo_props['altitude_km'] == -1:
@@ -596,15 +585,149 @@ def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: boo
     return stations, t
 
 
+def run_xrotor_oper(xrr_file: str, vorform: str, adva: float = None, rpm: float = None, thrust: float = None,
+                    torque: float = None, power: float = None, velo: float = None, hide_windows: bool = True,
+                    verbose: bool = True, tmout: int = None, xrotor_verbose: bool = False):
+
+    # increase the timeout for vrtx
+    if tmout is None and vorform.lower() == 'vrtx':
+        tmout = 25
+    elif tmout is None:
+        tmout = 10
+
+    # vorform has to be one of these three things
+    if vorform.lower() not in ['grad', 'pot', 'vrtx']:
+        raise Error('Input "vorform" must be one of ["grad", "pot", "vrtx"]')
+
+    # filename stuff
+    dirname, fname = os.path.split(xrr_file)
+    relpath = os.path.join(os.path.split(dirname)[1], fname)
+
+    # first we set the vorform
+    cmnds = ['load {}\n'.format(relpath), 'oper', 'form', '{}\n'.format(vorform)]
+
+    # if we are changing the velo, do that next
+    if velo is not None:
+        cmnds.extend(['velo', '{}'.format(velo), 'rein\n\ny'])
+
+    # can only be changing 1 of the 5 at a time
+    non_none_kwargs = [i for i in [adva, rpm, thrust, torque, power] if i is not None]
+    if len(non_none_kwargs) > 1:
+        raise Error('Can only change 1 of (adva, rpm, thrust, torque, power) at a time')
+
+    # command text based on which one was given
+    if adva is not None:
+        cmnds.extend(['adva', str(adva)])
+    elif rpm is not None:
+        cmnds.extend(['rpm', str(rpm)])
+    elif thrust is not None:
+        cmnds.extend(['thrust', str(thrust), 'p'])
+    elif torque is not None:
+        cmnds.extend(['torque', str(torque), 'p'])
+    elif power is not None:
+        cmnds.extend(['power', str(power), 'p'])
+    else:  # all were None
+        pass
+
+    # remove the output files if they exist for some reason already
+    oper_out_file, oper_out_fullpath = 'oper_out.txt', os.path.join(get_prop_db(), 'oper_out.txt')
+    wvel_out_file, wvel_out_fullpath = 'wvel_out.txt', os.path.join(get_prop_db(), 'wvel_out.txt')
+    if os.path.exists(oper_out_fullpath):
+        os.remove(oper_out_fullpath)
+    if os.path.exists(wvel_out_fullpath):
+        os.remove(wvel_out_fullpath)
+
+    # finalize the list of commands and write them to a file
+    cmnds.extend(['writ {}'.format(oper_out_file), 'wvel {}'.format(wvel_out_file), '\n\nquit\n'])
+    xrotor_cmnd_file = os.path.join(get_prop_db(), 'oper_run_inputs.txt')
+    with open(xrotor_cmnd_file, 'w') as f:
+        f.write('\n'.join(cmnds))
+
+    # run the mutha
+    xrotor_fpath = os.path.join(get_prop_db(), 'xrotor.exe')
+    with open(xrotor_cmnd_file, 'r') as f:
+        sui = subprocess.STARTUPINFO()
+        if hide_windows:
+            sui.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        if verbose:
+            Info('Running XROTOR for off-design operating point...', indent_level=1)
+        if xrotor_verbose:
+            out_err_kw = {}
+        else:
+            out_err_kw = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.STDOUT}
+
+        subprocess.run([xrotor_fpath], startupinfo=sui, stdin=f, **out_err_kw,
+                       timeout=tmout, cwd=get_prop_db())
+
+    # get the returned velo and rpm for naming reasons
+    oper_output = read_xrotor_op_file(oper_out_fullpath)
+    returned_velo = oper_output['speed(m/s)']
+    returned_rpm = oper_output['rpm']
+
+    # rename / move the output files into the database
+    oper_savedir = os.path.join(os.path.split(oper_out_fullpath)[0], dirname, 'oper_data')
+    if not os.path.exists(oper_savedir):
+        os.mkdir(oper_savedir)
+    oper_copypath = os.path.join(oper_savedir, 'velo_{:.0f}_rpm_{:.0f}.oper'.format(100 * returned_velo, returned_rpm))
+    shutil.copyfile(oper_out_fullpath, oper_copypath)
+
+    wvel_savedir = os.path.join(os.path.split(wvel_out_fullpath)[0], dirname, 'wvel_data')
+    if not os.path.exists(wvel_savedir):
+        os.mkdir(wvel_savedir)
+    wvel_copypath = os.path.join(wvel_savedir, 'velo_{:.0f}_rpm_{:.0f}.wvel'.format(100 * returned_velo, returned_rpm))
+    shutil.copyfile(wvel_out_fullpath, wvel_copypath)
+
+    # delete the temporary files
+    os.remove(xrotor_cmnd_file)
+    os.remove(oper_out_fullpath)
+    os.remove(wvel_out_fullpath)
+
+    return
+
+
+def read_xrotor_wvel_file(fpath:str):
+    with open(fpath, 'r') as f:
+        txt = f.read().strip()
+    lines = [ln.strip() for ln in txt.split('\n') if ln != '']
+
+    data = {}
+    for i, line in enumerate(lines):
+        words = [w.strip() for w in line.split(' ') if w != '']
+        if i in [3, 4]:
+            for j, word in enumerate(words):
+                if 'rpm' in word.lower():
+                    data['rpm'] = float(words[j + 1])
+                elif 'vel' in word.lower():
+                    data['vel'] = float(words[j + 1])
+                elif 'beta_tip' in word.lower():
+                    data['beta_tip'] = float(words[j + 1])
+                elif 'power' in word.lower():
+                    data['power'] = float(words[j + 1])
+                elif 'thrust' in word.lower():
+                    data['thrust'] = float(words[j + 1])
+        elif i == 6:
+            headers = [ln.strip() for ln in line.replace(' + ', '+').split(' ') if ln != '']
+            for header in headers:
+                data.setdefault(header, [])
+        elif i > 6:
+            vals = [ln.strip() for ln in line.split(' ') if ln != '']
+            for v, val in enumerate(vals):
+                data[headers[v]].append(float(val))
+
+    return data
+
+
 def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, hub_wake_disp_br: float,
                      design_speed_mps: float, design_cl: dict, design_atmo_props: dict, design_vorform: str,
                      station_params: dict = None, design_adv: float = None, design_rpm: float = None,
                      design_thrust: float = None, design_power: float = None, n_radial: int = 50,
                      verbose: bool = False, show_station_fit_plots: bool = True, plot_after: bool = True,
-                     tmout: int = 30, hide_windows: bool = True, geo_params: dict = {}):
+                     tmout: int = None, hide_windows: bool = True, geo_params: dict = {}):
     # adjust timeout for vrtx
-    if design_vorform == 'vrtx':
+    if tmout is None and design_vorform == 'vrtx':
         tmout = 100
+    elif tmout is None:
+        tmout = 30
 
     # name must be less than 38? characters for XROTOR to be able to save it
     if len(name) > 38:
@@ -732,7 +855,7 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
         sui = subprocess.STARTUPINFO()
         if hide_windows:
             sui.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        if not verbose:
+        if verbose:
             Info('Running XROTOR to create new geometry...')
         subprocess.run([xrotor_fpath], startupinfo=sui, stdin=f, #stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
                        timeout=tmout, cwd=os.path.join(get_prop_db(), name))
@@ -819,6 +942,17 @@ def convert_ps2png(ps_fpath: str, return_pil_img: bool = False, show_in_pyplot: 
 
 
 # =============== MODELING / PHYSICS ===============
+def calc_re(rho: float = None, vel: float = None, chord: float = None, mu: float = None, rpm: float = None,
+            radius: float = None):
+    if all([i is not None for i in [rho, vel, chord, mu]]):
+        re = rho * vel * chord / mu
+    elif all([i is not None for i in [rho, rpm, radius, chord, mu]]):
+        re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
+    else:
+        raise Error('Must input all of either [rho, vel, chord, mu] or [rho, rpm, radius, chord, mu]')
+    return re
+
+
 def standard_atmosphere(altitude_km: float) -> dict:  # standard atmosphere eqs from Jake's college prof.
 
     alt_m = altitude_km * 1000

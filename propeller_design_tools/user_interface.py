@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from propeller_design_tools.airfoil import Airfoil
-from propeller_design_tools.user_settings import _get_cursor_fpath, _get_gunshot_fpaths
+from propeller_design_tools.settings import _get_cursor_fpath, _get_gunshot_fpaths
 from propeller_design_tools.funcs import get_all_airfoil_files, get_all_propeller_dirs
 try:
     from PyQt5 import QtWidgets, QtGui, QtCore, QtMultimedia
