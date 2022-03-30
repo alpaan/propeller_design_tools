@@ -66,6 +66,18 @@ class Propeller(object):
         self.wvel_data.load_wvel_sweep_results()
 
     @property
+    def tot_skew(self):
+        return self.geo_params['tot_skew']
+
+    @property
+    def n_prof_pts(self):
+        return self.geo_params['n_prof_pts']
+
+    @property
+    def n_profs(self):
+        return self.geo_params['n_profs']
+
+    @property
     def design_rho(self):
         if 'dens' in self.design_atmo_props:
             return self.design_atmo_props['dens']
@@ -87,8 +99,8 @@ class Propeller(object):
 
     @property
     def disk_loading(self):
-        if self.design_thrust is not None and self.disk_area_m_sqrd is not None:
-            return self.design_thrust / self.disk_area_m_sqrd
+        if self.xrotor_op_dict is not None and self.disk_area_m_sqrd is not None:
+            return self.xrotor_op_dict['thrust(N)'] / self.disk_area_m_sqrd
 
     @property
     def oper_data_dir(self):
@@ -97,6 +109,10 @@ class Propeller(object):
     @property
     def wvel_data_dir(self):
         return os.path.join(os.path.split(self.meta_file)[0], 'wvel_data')
+
+    @property
+    def n_radial(self):
+        return len(self.blade_xyz_profiles)
 
     def read_pdt_metafile(self):
         # read in the PDT meta-file (in the root propeller database) and set Propeller attrs
@@ -731,10 +747,13 @@ class PropellerOperData:
         self.datapoints = None
 
     def get_oper_files(self, fullpath: bool = True):
-        if fullpath:
-            return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.oper')]
+        if os.path.exists(self.directory):
+            if fullpath:
+                return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.oper')]
+            else:
+                return [name for name in os.listdir(self.directory) if name.endswith('.oper')]
         else:
-            return [name for name in os.listdir(self.directory) if name.endswith('.oper')]
+            return []
 
     def load_oper_sweep_results(self, verbose: bool = True):
         self.datapoints = d = {}
@@ -775,10 +794,13 @@ class PropellerWVelData:
         self.datapoints = None
 
     def get_wvel_files(self, fullpath: bool = True):
-        if fullpath:
-            return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.wvel')]
+        if os.path.exists(self.directory):
+            if fullpath:
+                return [os.path.join(self.directory, name) for name in os.listdir(self.directory) if name.endswith('.wvel')]
+            else:
+                return [name for name in os.listdir(self.directory) if name.endswith('.wvel')]
         else:
-            return [name for name in os.listdir(self.directory) if name.endswith('.wvel')]
+            return []
 
     def load_wvel_sweep_results(self, verbose: bool = True):
         self.datapoints = d = {}

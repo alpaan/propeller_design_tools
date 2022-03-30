@@ -578,7 +578,8 @@ def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: boo
                   format(idx + 1, prop.station_params[xi]))
         fn = prop.station_params[xi]
         foil = Airfoil(name=fn)
-        re_est = int(calc_re(rho=rho, rpm=prop.design_rpm, radius=prop.radius * xi, chord=prop.radius / 10, mu=mu))
+        re_est = int(calc_re(rho=rho, rpm=prop.design_rpm, radius=prop.radius * xi, chord=prop.radius / 10, mu=mu,
+                             vel=prop.design_speed_mps, adv=prop.design_adv))
         st = RadialStation(station_idx=idx, Xisection=xi, foil=foil, re_estimate=re_est, plot=plot_also)
         t += st.generate_txt_params()
         stations.append(st)
@@ -883,11 +884,6 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
 
     # save the PDT propeller meta-file, and then read in the operating point dictionary by calling load_from_savefile()
     prop.xrotor_op_dict = read_xrotor_op_file(prop.xrop_file)
-    if prop.design_thrust is None:
-        prop.design_thrust = prop.xrotor_op_dict['thrust(N)']
-    if prop.design_rho is None:
-        prop.design_rho = prop.xrotor_op_dict['rho(kg/m3)']
-
     prop.save_meta_file()
     prop.load_from_savefile()   # reads meta, xrr, xrop, and point clouds
 
@@ -943,10 +939,13 @@ def convert_ps2png(ps_fpath: str, return_pil_img: bool = False, show_in_pyplot: 
 
 # =============== MODELING / PHYSICS ===============
 def calc_re(rho: float = None, vel: float = None, chord: float = None, mu: float = None, rpm: float = None,
-            radius: float = None):
+            radius: float = None, adv: float = None):
     if all([i is not None for i in [rho, vel, chord, mu]]):
         re = rho * vel * chord / mu
     elif all([i is not None for i in [rho, rpm, radius, chord, mu]]):
+        re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
+    elif all([i is not None for i in [rho, vel, adv, radius, chord, mu]]):
+        rpm = vel / np.pi / 2 / radius / adv
         re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
     else:
         raise Error('Must input all of either [rho, vel, chord, mu] or [rho, rpm, radius, chord, mu]')

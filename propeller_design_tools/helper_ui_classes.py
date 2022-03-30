@@ -144,7 +144,8 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
 
         old_db = self.current_db_lbl.text()
         if db_dir == old_db:
-            return
+            pass
+            # return
 
         self.current_db_lbl.setText(db_dir)
         self.db_dir = db_dir
@@ -161,7 +162,7 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
                 set_propeller_database(path=db_dir)
             self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
 
-        self.found_lbl.setText(self.found_txt)
+        self.update_found_lbl()
         self.currentDatabaseChanged.emit(self.db_dir)
 
     def set_btn_clicked(self):
@@ -170,6 +171,9 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         direc = QtWidgets.QFileDialog.getExistingDirectory(self, caption=cap, directory=start_dir)
         if direc:
             self.set_current_db(db_dir=direc)
+
+    def update_found_lbl(self):
+        self.found_lbl.setText(self.found_txt)
 
 
 class RangeLineEditWidget(QtWidgets.QWidget):

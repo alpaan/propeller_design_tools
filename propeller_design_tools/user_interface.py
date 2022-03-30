@@ -9,7 +9,7 @@ try:
         AxesComboBoxWidget, PdtGuiPrinter
     from propeller_design_tools.foil_ui_classes import ExistingFoilDataWidget, FoilAnalysisWidget, AddFoilDataPointWidget
     from propeller_design_tools.prop_creation_ui_classes import PropellerCreationWidget
-    from propeller_design_tools.prop_sweep_ui_classes import PropellerSweepWidget
+    from propeller_design_tools.prop_analysis_ui_classes import PropellerSweepWidget
     from propeller_design_tools.opt_ui_classes import OptimizationWidget
     from propeller_design_tools.helper_ui_subclasses import PDT_TextEdit, PDT_GroupBox, PDT_Label, PDT_PushButton, \
         PDT_ComboBox, PDT_TabWidget
@@ -53,7 +53,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         tab_widg.addTab(self.af_widg, 'Airfoil Analysis'.upper())
         self.prop_widg = PropellerCreationWidget(main_win=self)
         tab_widg.addTab(self.prop_widg, 'Propeller Creation'.upper())
-        self.prop_sweep_widg = PropellerSweepWidget()
+        self.prop_sweep_widg = PropellerSweepWidget(main_win=self)
         tab_widg.addTab(self.prop_sweep_widg, 'Propeller Analysis'.upper())
         self.opt_widg = OptimizationWidget()
         tab_widg.addTab(self.opt_widg, 'Optimization'.upper())

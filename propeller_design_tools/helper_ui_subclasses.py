@@ -109,6 +109,7 @@ class PDT_PushButton(QtWidgets.QPushButton):
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
         width = kwargs.pop('width') if 'width' in kwargs else None
+        height = kwargs.pop('height') if 'height' in kwargs else None
 
         super(PDT_PushButton, self).__init__(*args, **kwargs)
 
@@ -116,6 +117,7 @@ class PDT_PushButton(QtWidgets.QPushButton):
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
         self.set_width(width=width)
+        self.set_height(height=height)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -135,6 +137,10 @@ class PDT_PushButton(QtWidgets.QPushButton):
     def set_width(self, width: int):
         if width is not None:
             self.setFixedWidth(width)
+
+    def set_height(self, height: int):
+        if height is not None:
+            self.setFixedHeight(height)
 
 
 class PDT_LineEdit(QtWidgets.QLineEdit):
