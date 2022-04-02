@@ -49,7 +49,7 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         # tab widget
         tab_widg = PDT_TabWidget(font_size=16, italic=True)
         center_lay.addWidget(tab_widg)
-        self.af_widg = FoilAnalysisWidget()
+        self.af_widg = FoilAnalysisWidget(main_win=self)
         tab_widg.addTab(self.af_widg, 'Airfoil Analysis'.upper())
         self.prop_widg = PropellerCreationWidget(main_win=self)
         tab_widg.addTab(self.prop_widg, 'Propeller Creation'.upper())
@@ -187,31 +187,66 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         machs = np.arange(mach_min, mach_max, mach_step)
         ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
 
-        total_polars = len(res) * len(machs) * len(ncrits)
+        self.thread = QtCore.QThread()
+        self.foil_worker = AddFoilDataWorker(foil=self.foil, res=res, machs=machs, ncrits=ncrits)
+        self.foil_worker.moveToThread(self.thread)
+        self.thread.started.connect(self.foil_worker.run)
+        self.foil_worker.finished.connect(self.thread.quit)
+        self.foil_worker.finished.connect(self.foil_worker.deleteLater)
+        self.foil_worker.finished.connect(self.on_foil_worker_finish)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.foil_worker.progress.connect(self.update_foil_worker_progress)
 
-        counter = 0
-        for re in res:
-            for mach in machs:
-                for ncrit in ncrits:
-                    counter += 1
-                    self.print('Calculating...(Re={}, mach={}, ncrit={})'.format(re, mach, ncrit))
-                    QtWidgets.QApplication.processEvents()
+        self.af_widg.add_foil_data_widg.setEnabled(False)
+        self.af_widg.exist_data_widg.setEnabled(False)
+        self.af_widg.select_foil_cb.setEnabled(False)
+        self.thread.start()
 
-                    with Capturing() as output:
-                        self.foil.calculate_xfoil_polars(re=[re], mach=[mach], ncrit=[ncrit])
-                    self.console_te.append('\n'.join(output))
+    def on_foil_worker_finish(self):
+        self.af_widg.add_foil_data_widg.setEnabled(True)
+        self.af_widg.exist_data_widg.setEnabled(True)
+        self.af_widg.select_foil_cb.setEnabled(True)
+        self.prog_bar.setValue(0)
 
-                    with Capturing() as output:
-                        self.foil.load_polar_data()
-                    self.console_te.append('\n'.join(output))
-                    self.prog_bar.setValue(int(counter / total_polars * 100))
-                    self.select_foil_cb_changed(foil_txt=self.af_widg.select_foil_cb.currentText())  # updates everything
+    def update_foil_worker_progress(self, prog: int, output: list):
+        self.print(output)
+        self.prog_bar.setValue(prog)
+        with Capturing() as output:
+            self.foil.load_polar_data()
+        self.print(output)
+        self.select_foil_cb_changed(foil_txt=self.af_widg.select_foil_cb.currentText())  # updates everything
 
     def reset_foil_ranges_btn_clicked(self):
         self.af_widg.add_foil_data_widg.reset_ranges()
 
     def print(self, s: str, fontfamily: str = None):
         self.printer.print(s, fontfamily=fontfamily)
+
+
+class AddFoilDataWorker(QtCore.QObject):
+    finished = QtCore.pyqtSignal()
+    progress = QtCore.pyqtSignal(int, list)
+
+    def __init__(self, foil: 'Airfoil', res: list, machs: list, ncrits: list):
+        super(AddFoilDataWorker, self).__init__()
+        self.foil = foil
+        self.res = res
+        self.machs = machs
+        self.ncrits = ncrits
+
+    def run(self):
+        total_polars = len(self.res) * len(self.machs) * len(self.ncrits)
+
+        counter = 0
+        for re in self.res:
+            for mach in self.machs:
+                for ncrit in self.ncrits:
+                    counter += 1
+                    with Capturing() as output:
+                        self.foil.calculate_xfoil_polars(re=[re], mach=[mach], ncrit=[ncrit])
+                    self.progress.emit(int(counter / total_polars * 100), output)
+
+        self.finished.emit()
 
 
 if __name__ == '__main__':

@@ -661,7 +661,7 @@ class Propeller(object):
             self.plot_stl_mesh()
 
     def plot_stl_mesh(self):
-        fig = plt.figure(figsize=(10, 8))
+        self.stl_fig = fig = plt.figure(figsize=(10, 8))
         ax3d = fig.add_subplot(projection='3d')
         stl_fname = os.path.split(self.stl_fpath)[-1]
         ax3d.set_title(stl_fname)

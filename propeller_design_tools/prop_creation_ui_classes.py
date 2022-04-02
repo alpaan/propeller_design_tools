@@ -1,3 +1,5 @@
+import subprocess
+
 import numpy as np
 import os
 from propeller_design_tools.propeller import Propeller
@@ -50,6 +52,8 @@ class PropellerCreationWidget(QtWidgets.QWidget):
             self.plot3d_widg.enable_edit_chk.setEnabled(False)
             self.control_widg.set_inputs_to_default()
             self.control_widg.set_enable(True)
+            self.control_widg.save_stl_btn.setEnabled(False)
+            self.control_widg.show_blade_profs_btn.setEnabled(False)
         else:
             with Capturing() as output:
                 self.prop = Propeller(name=curr_txt)
@@ -60,6 +64,8 @@ class PropellerCreationWidget(QtWidgets.QWidget):
             self.main_win.print('XROTOR OUTPUT:')
             self.main_win.print(self.prop.get_xrotor_output_text(), fontfamily='consolas')
             self.control_widg.set_enable(False)
+            self.control_widg.save_stl_btn.setEnabled(True)
+            self.control_widg.show_blade_profs_btn.setEnabled(True)
 
 
 class PropellerCreationControlWidget(QtWidgets.QWidget):
@@ -178,6 +184,19 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         temp_lay.addWidget(self.save_new_btn)
         form_lay2c.addRow(temp_lay)
 
+        # Other geo buttons
+        self.save_stl_btn = save_stl_btn = PDT_PushButton('Generate STL\nGeom. File', width=160, height=50, font_size=12)
+        self.show_blade_profs_btn = show_blade_profs_btn = PDT_PushButton('Show Blade xyz\nProfiles in Explorer', width=200,
+                                                                          height=50, font_size=12)
+        save_stl_btn.setEnabled(False)
+        show_blade_profs_btn.setEnabled(False)
+        save_stl_btn.clicked.connect(self.save_stl_btn_clicked)
+        show_blade_profs_btn.clicked.connect(self.show_blade_profs_btn_clicked)
+        temp_lay2 = QtWidgets.QHBoxLayout()
+        temp_lay2.addWidget(save_stl_btn)
+        temp_lay2.addWidget(show_blade_profs_btn)
+        form_lay2c.addRow(temp_lay2)
+
         # store a list of widgets to toggle enable on
         self.widgets_to_toggle = [self.name_le, self.nblades_sb, self.radius_sb, self.hub_radius_sb,
                                   self.hub_wake_disp_br_sb, self.vorform_cb, self.nradial_sb, self.design_speed_sb,
@@ -189,6 +208,23 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
 
         # set all the inputs to default
         self.set_inputs_to_default()
+
+    def save_stl_btn_clicked(self):
+        prop = self.main_win.prop_widg.prop
+        if prop is None:
+            return
+
+        with Capturing() as output:
+            prop.generate_stl_geometry(plot_after=False)
+        self.main_win.print(output)
+
+    def show_blade_profs_btn_clicked(self):
+        prop = self.main_win.prop_widg.prop
+        if prop is None:
+            return
+
+        if os.path.exists(prop.bld_prof_folder):
+            subprocess.Popen('explorer "{}"'.format(os.path.normpath(prop.bld_prof_folder)))
 
     def save_new_btn_clicked(self):
         # savename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Enter New Save Name', self.main_win.prop_db_select_widg.db_dir)
@@ -279,13 +315,14 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         else:
             self.design_power_sb.setValue(0)
 
-        cl_type, cl_value = list(prop.design_cl.items())[0]
-        if cl_type == 'const':
-            self.design_cl_le.setText('{}'.format(cl_value))
-        elif cl_type == 'linear':
-            self.design_cl_le.setText('{}, {}'.format(cl_value[0], cl_value[1]))
-        else:
+        if len(prop.design_cl) == 1 and 'const' in prop.design_cl:
+            self.design_cl_le.setText('{}'.format(prop.design_cl['const']))
+        elif len(prop.design_cl) == 1 and 'file' in prop.design_cl:
             pass
+        else:
+            assert 'root' in prop.design_cl
+            assert 'tip' in prop.design_cl
+            self.design_cl_le.setText('{}, {}'.format(prop.design_cl['root'], prop.design_cl['tip']))
 
         if 'altitude_km' in prop.design_atmo_props:
             self.atmo_props_widg.altitude_sb.setValue(prop.design_atmo_props['altitude_km'])

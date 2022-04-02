@@ -24,7 +24,8 @@ def delete_propeller(prop, verbose: bool = True):
         Info('Removed paths: {}'.format(rmvd))
 
 
-def clear_foil_database(inside_root_db: bool = False, inside_polar_db: bool = True, inside_for_xfoil: bool = True):
+def clear_foil_database(single_foil: str = None, inside_root_db: bool = False, inside_polar_db: bool = True,
+                        inside_for_xfoil: bool = True, verbose: bool = True):
     """
     Helper function to clear out files from foil database.
 
@@ -33,12 +34,35 @@ def clear_foil_database(inside_root_db: bool = False, inside_polar_db: bool = Tr
     :param inside_for_xfoil:
     :return:
     """
-    if inside_root_db:
-        delete_files_from_folder(_get_user_settings()['airfoil_database'])
-    if inside_polar_db:
-        delete_files_from_folder(os.path.join(_get_user_settings()['airfoil_database'], 'polar_database'))
-    if inside_for_xfoil:
-        delete_files_from_folder(os.path.join(_get_user_settings()['airfoil_database'], 'for_xfoil'))
+    if single_foil is not None:
+        single_foil = '{}.dat'.format(single_foil) if not single_foil.endswith('.dat') else single_foil
+
+    foils_2_del = [single_foil] if single_foil is not None else get_all_airfoil_files()
+
+    for foil_file in foils_2_del:
+        foil_name = foil_file.replace('.dat', '')
+        if verbose:
+            Info('Clearing files for "{}"'.format(foil_name))
+
+        foil_fpath = os.path.join(_get_user_settings()['airfoil_database'], foil_file)
+        polar_fpath = os.path.join(_get_user_settings()['airfoil_database'], 'polar_database', '{}_polar_data.txt'.format(foil_name))
+        xfoil_fpath = os.path.join(_get_user_settings()['airfoil_database'], 'for_xfoil', '{}.txt'.format(foil_name))
+
+        if inside_root_db:
+            if os.path.exists(foil_fpath):
+                os.remove(foil_fpath)
+                if verbose:
+                    Info('Removed file "{}"'.format(foil_fpath), indent_level=1)
+        if inside_polar_db:
+            if os.path.exists(polar_fpath):
+                os.remove(polar_fpath)
+                if verbose:
+                    Info('Removed file "{}"'.format(polar_fpath), indent_level=1)
+        if inside_for_xfoil:
+            if os.path.exists(xfoil_fpath):
+                os.remove(xfoil_fpath)
+                if verbose:
+                    Info('Removed file "{}"'.format(xfoil_fpath), indent_level=1)
 
 
 def clear_prop_database(inside_root_db: bool = True, inside_xrotor_files: bool = True, inside_op_files: bool = True):

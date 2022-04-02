@@ -88,11 +88,17 @@ class PdtGuiPrinter:
     def __init__(self, console_te: PDT_TextEdit):
         self.console_te = console_te
 
-    def print(self, s: str, fontfamily: str = None):
+    def print(self, s: Union[str, list], fontfamily: str = None):
         old_ff = self.console_te.fontFamily()
         if fontfamily is not None:
             self.console_te.setFontFamily(fontfamily)
-        self.console_te.append('PDT GUI:  {}'.format(s))
+
+        if isinstance(s, list):
+            for s_str in s:
+                self.console_te.append('PDT GUI:  {}'.format(s_str))
+        else:  # s is a string
+            self.console_te.append('PDT GUI:  {}'.format(s))
+
         self.console_te.setFontFamily(old_ff)
 
 

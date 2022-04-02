@@ -1,6 +1,7 @@
 import propeller_design_tools as pdt
 
 
+# pdt.clear_foil_database(single_foil='clarky.dat', inside_root_db=False, inside_polar_db=True, inside_for_xfoil=True)
 pdt.start_ui()
 
 # prop = pdt.Propeller('MyPropeller')

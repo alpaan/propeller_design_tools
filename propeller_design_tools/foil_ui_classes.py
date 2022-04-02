@@ -1,18 +1,20 @@
-from propeller_design_tools.funcs import delete_all_widgets_from_layout, get_all_airfoil_files
+from propeller_design_tools.funcs import delete_all_widgets_from_layout, get_all_airfoil_files, clear_foil_database
 from propeller_design_tools.airfoil import Airfoil
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 try:
     from PyQt5 import QtWidgets, QtCore
     from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_GroupBox, PDT_PushButton, PDT_ComboBox, \
         PDT_CheckBox
-    from propeller_design_tools.helper_ui_classes import RangeLineEditWidget, SingleAxCanvas, AxesComboBoxWidget
+    from propeller_design_tools.helper_ui_classes import RangeLineEditWidget, SingleAxCanvas, AxesComboBoxWidget, \
+        Capturing
 except:
     pass
 
 
 class FoilAnalysisWidget(QtWidgets.QWidget):
-    def __init__(self):
+    def __init__(self, main_win: 'InterfaceMainWindow'):
         super(FoilAnalysisWidget, self).__init__()
+        self.main_win = main_win
 
         # airfoil group
         af_lay = QtWidgets.QHBoxLayout()
@@ -26,11 +28,11 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
 
         # airfoil left
         af_left_lay.addStretch()
-        self.exist_data_widg = ExistingFoilDataWidget(main_win=self)
+        self.exist_data_widg = ExistingFoilDataWidget(main_win=self.main_win)
         self.exist_data_widg.setEnabled(False)
         af_left_lay.addWidget(self.exist_data_widg)
         af_left_lay.addStretch()
-        self.add_foil_data_widg = AddFoilDataPointWidget(main_win=self)
+        self.add_foil_data_widg = AddFoilDataPointWidget(main_win=self.main_win)
         af_left_lay.addWidget(self.add_foil_data_widg)
         af_left_lay.addStretch()
 
@@ -79,6 +81,9 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
 
         title_lbl = PDT_Label('Existing Data (plot controls)', font_size=14, bold=True)
         lay.addWidget(title_lbl)
+        del_btn = PDT_PushButton('Delete All', width=180, font_size=12)
+        del_btn.clicked.connect(self.del_btn_clicked)
+        lay.addWidget(del_btn)
         btm_lay = QtWidgets.QHBoxLayout()
         lay.addLayout(btm_lay)
 
@@ -102,6 +107,13 @@ class ExistingFoilDataWidget(QtWidgets.QWidget):
 
         # gets the all checkboxes in there
         self.update_airfoil()
+
+    def del_btn_clicked(self):
+        if self.main_win.foil is not None:
+            with Capturing() as output:
+                clear_foil_database(single_foil=self.main_win.foil.name)
+            self.main_win.printer.print(output)
+            self.main_win.select_foil_cb_changed(foil_txt=self.main_win.foil.name)
 
     def update_airfoil(self, af: Airfoil = None):
         delete_all_widgets_from_layout(layout=self.re_lay)
