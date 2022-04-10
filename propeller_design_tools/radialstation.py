@@ -149,7 +149,7 @@ class RadialStation(object):
         self.CLinc2stall = self.CLmax - cl_pre_stall
 
         # ===== Fitting the CD(CL) Curve =====
-        # get "optimal" fitting parameters using scipy.optimize.curve_fit
+        # get "optimal" fitting parameters using scipy.create_prop_grid.curve_fit
         if pol['CD'][min_idx] > pol['CD'][pre_stall_idx]:
             min_idx = np.where(pol['CD'] < pol['CD'][pre_stall_idx])[0][0] - 1
         xs = pol['CL'][min_idx:pre_stall_idx]
@@ -306,12 +306,12 @@ class RadialStation(object):
         txt = ''
         txt += '\nSection {}   r/R = {:.3f}\n'.format(sect_num, self.Xisection)
         txt += '{}\n'.format('=' * 68)
-        txt += 'Zero-lift alpha (deg):   {:.2f}        Minimum Cd           : {:.4f}\n'.format(self.A0deg, self.CDmin)
-        txt += 'd(Cl)/d(alpha)       :  {:.4f}        Cl at minimum Cd     : {:.4f}\n'.format(np.rad2deg(self.dCLdA), self.CLCDmin)
-        txt += 'd(Cl)/d(alpha)@stall :  {:.3f}        d(Cd)/d(Cl**2)       : {:.4f}\n'.format(np.rad2deg(self.dCLdAstall), self.dCDdCL2)
+        txt += 'Zero-lift alpha (deg):  {:.2f}        Minimum Cd           :  {:.4f}\n'.format(self.A0deg, self.CDmin)
+        txt += 'd(Cl)/d(alpha)       :  {:.4f}        Cl at minimum Cd     :  {:.4f}\n'.format(np.rad2deg(self.dCLdA), self.CLCDmin)
+        txt += 'd(Cl)/d(alpha)@stall :  {:.3f}        d(Cd)/d(Cl**2)       :  {:.4f}\n'.format(np.rad2deg(self.dCLdAstall), self.dCDdCL2)
         txt += 'Maximum Cl           :  {:.2f}         Reference Re number  :  {}\n'.format(self.CLmax, self.REref)
-        txt += 'Minimum Cl           : {:.2f}         Re scaling exponent  : {:.4f}\n'.format(self.CLmin, self.REexp)
-        txt += 'Cl increment to stall:  {:.3f}        Cm                   : {:.3f}\n'.format(self.CLinc2stall, self.Cmconst)
+        txt += 'Minimum Cl           :  {:.2f}         Re scaling exponent  :  {:.4f}\n'.format(self.CLmin, self.REexp)
+        txt += 'Cl increment to stall:  {:.3f}        Cm                   :  {:.3f}\n'.format(self.CLinc2stall, self.Cmconst)
         txt += '                                     Mcrit                :  {:.3f}\n'.format(self.Mcrit)
         txt += '{}\n'.format('=' * 68)
         return txt

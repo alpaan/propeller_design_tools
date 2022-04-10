@@ -1,9 +1,10 @@
 import subprocess
-
 import numpy as np
 import os
 from propeller_design_tools.propeller import Propeller
 from propeller_design_tools.funcs import get_all_propeller_dirs, create_propeller, get_all_airfoil_files
+from propeller_design_tools.user_io import Error
+from propeller_design_tools.settings import get_prop_db
 
 try:
     from PyQt5 import QtWidgets, QtCore
@@ -53,6 +54,7 @@ class PropellerCreationWidget(QtWidgets.QWidget):
             self.control_widg.set_inputs_to_default()
             self.control_widg.set_enable(True)
             self.control_widg.save_stl_btn.setEnabled(False)
+            self.control_widg.show_stl_btn.setEnabled(False)
             self.control_widg.show_blade_profs_btn.setEnabled(False)
         else:
             with Capturing() as output:
@@ -65,6 +67,7 @@ class PropellerCreationWidget(QtWidgets.QWidget):
             self.main_win.print(self.prop.get_xrotor_output_text(), fontfamily='consolas')
             self.control_widg.set_enable(False)
             self.control_widg.save_stl_btn.setEnabled(True)
+            self.control_widg.show_stl_btn.setEnabled(True)
             self.control_widg.show_blade_profs_btn.setEnabled(True)
 
 
@@ -186,14 +189,18 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
 
         # Other geo buttons
         self.save_stl_btn = save_stl_btn = PDT_PushButton('Generate STL\nGeom. File', width=160, height=50, font_size=12)
+        self.show_stl_btn = show_stl_btn = PDT_PushButton('Show STL\nGeom. File', width=140, height=50, font_size=12)
         self.show_blade_profs_btn = show_blade_profs_btn = PDT_PushButton('Show Blade xyz\nProfiles in Explorer', width=200,
                                                                           height=50, font_size=12)
         save_stl_btn.setEnabled(False)
+        show_stl_btn.setEnabled(False)
         show_blade_profs_btn.setEnabled(False)
         save_stl_btn.clicked.connect(self.save_stl_btn_clicked)
+        show_stl_btn.clicked.connect(self.show_stl_btn_clicked)
         show_blade_profs_btn.clicked.connect(self.show_blade_profs_btn_clicked)
         temp_lay2 = QtWidgets.QHBoxLayout()
         temp_lay2.addWidget(save_stl_btn)
+        temp_lay2.addWidget(show_stl_btn)
         temp_lay2.addWidget(show_blade_profs_btn)
         form_lay2c.addRow(temp_lay2)
 
@@ -208,6 +215,14 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
 
         # set all the inputs to default
         self.set_inputs_to_default()
+
+    def show_stl_btn_clicked(self):
+        prop = self.main_win.prop_widg.prop
+        if prop is None:
+            return
+
+        if os.path.exists(prop.stl_fpath):
+            self.stl_fig = prop.plot_stl_mesh()
 
     def save_stl_btn_clicked(self):
         prop = self.main_win.prop_widg.prop
@@ -227,9 +242,15 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
             subprocess.Popen('explorer "{}"'.format(os.path.normpath(prop.bld_prof_folder)))
 
     def save_new_btn_clicked(self):
-        # savename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Enter New Save Name', self.main_win.prop_db_select_widg.db_dir)
-        msgbox = QtWidgets.QMessageBox()
-        msgbox.about(self, 'Error', 'Not yet implemented')
+        savedir, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Enter New Save Name', self.main_win.prop_db_select_widg.db_dir)
+        if savedir:
+            savename = os.path.split(savedir)[1]
+            savedir = os.path.join(get_prop_db(), savename)
+
+            if not os.path.exists(savedir):
+                os.mkdir(savedir)
+
+            self.main_win.prop_widg.prop.save_as_new(new_name=savename)
 
     def set_enable(self, enable: bool):
         for widg in self.widgets_to_toggle:
@@ -422,35 +443,36 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         else:
             atmo_props = {'rho': rho, 'nu': nu, 'vsou': vsou}
 
-        with Capturing() as output:
-            prop = create_propeller(name=name,
-                                    nblades=nblades,
-                                    radius=radius,
-                                    hub_radius=hub_radius,
-                                    hub_wake_disp_br=hub_wk_disp_br,
-                                    design_speed_mps=speed,
-                                    design_cl=cl_dict,
-                                    design_atmo_props=atmo_props,
-                                    design_vorform=vorform,
-                                    station_params=stations_dict,
-                                    design_adv=adv,
-                                    design_rpm=rpm,
-                                    design_thrust=thrust,
-                                    design_power=power,
-                                    n_radial=nradial,
-                                    verbose=True,
-                                    show_station_fit_plots=False,
-                                    plot_after=False,
-                                    tmout=None,
-                                    hide_windows=True,
-                                    geo_params={'tot_skew': skew, 'n_prof_pts': n_prof_pts, 'n_profs': n_profs})
-        self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
-
-        if prop:
-            self.main_win.prop_db_select_widg.update_found_lbl()
-            self.main_win.prop_widg.plot3d_widg.populate_select_prop_cb()
-            self.main_win.prop_widg.plot3d_widg.select_prop_cb.setCurrentText(prop.name)
-
+        try:
+            with Capturing() as output:
+                prop = create_propeller(name=name,
+                                        nblades=nblades,
+                                        radius=radius,
+                                        hub_radius=hub_radius,
+                                        hub_wake_disp_br=hub_wk_disp_br,
+                                        design_speed_mps=speed,
+                                        design_cl=cl_dict,
+                                        design_atmo_props=atmo_props,
+                                        design_vorform=vorform,
+                                        station_params=stations_dict,
+                                        design_adv=adv,
+                                        design_rpm=rpm,
+                                        design_thrust=thrust,
+                                        design_power=power,
+                                        n_radial=nradial,
+                                        verbose=True,
+                                        show_station_fit_plots=False,
+                                        plot_after=False,
+                                        tmout=None,
+                                        hide_windows=True,
+                                        geo_params={'tot_skew': skew, 'n_prof_pts': n_prof_pts, 'n_profs': n_profs})
+            self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
+            if prop:
+                self.main_win.prop_db_select_widg.update_found_lbl()
+                self.main_win.prop_widg.plot3d_widg.populate_select_prop_cb()
+                self.main_win.prop_widg.plot3d_widg.select_prop_cb.setCurrentText(prop.name)
+        except Exception as e:
+            self.main_win.print(e)
 
 class Propeller3dPlotWidget(QtWidgets.QWidget):
     def __init__(self, main_win: 'InterfaceMainWindow'):

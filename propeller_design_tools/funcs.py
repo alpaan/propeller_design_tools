@@ -517,19 +517,22 @@ def read_xrotor_op_file(fpath: str):
             for i in range(len(spl) - 1):
                 key = spl[i].split('  ')[-1].strip()
                 val = spl[i + 1].split('  ')[0].strip()
-                if val[0].isnumeric():
+                if val[0].isnumeric() or val[1].isnumeric():
                     d[key] = float(val)
                 else:
                     d[key] = val
         else:   # listout at bottom
-            vals = [val.strip() for val in line.replace('-', ' -').split(' ') if val != '']
+            vals = [val.strip() for val in line.replace('-', ' -').replace('s', ' ').split(' ') if val != '']
             if headers is None:
                 headers = vals.copy()
                 for h in headers:
                     d[h] = []
             else:
                 for i, val in enumerate(vals):
-                    d[headers[i]].append(float(val))
+                    try:
+                        d[headers[i]].append(float(val))
+                    except ValueError:
+                        d[headers[i]].append(np.nan)
 
     # go thru and turn into np.arrays now
     for h in headers:
@@ -601,10 +604,10 @@ def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: boo
             Info('Auto-generating section inputs from airfoil database data for section {} ({})...'.
                   format(idx + 1, prop.station_params[xi]))
         fn = prop.station_params[xi]
-        foil = Airfoil(name=fn)
-        re_est = int(calc_re(rho=rho, rpm=prop.design_rpm, radius=prop.radius * xi, chord=prop.radius / 10, mu=mu,
-                             vel=prop.design_speed_mps, adv=prop.design_adv))
-        st = RadialStation(station_idx=idx, Xisection=xi, foil=foil, re_estimate=re_est, plot=plot_also)
+        foil = Airfoil(name=fn, verbose=verbose)
+        re_est = int(calc_rotational_re(rho=rho, rpm=prop.design_rpm, radius=prop.radius * xi, chord=prop.radius / 10,
+                                        mu=mu, vel=prop.design_speed_mps, adv=prop.design_adv))
+        st = RadialStation(station_idx=idx, Xisection=xi, foil=foil, re_estimate=re_est, plot=plot_also, verbose=verbose)
         t += st.generate_txt_params()
         stations.append(st)
     return stations, t
@@ -717,6 +720,7 @@ def read_xrotor_wvel_file(fpath:str):
 
     data = {}
     for i, line in enumerate(lines):
+        line = line.replace('=', '= ')
         words = [w.strip() for w in line.split(' ') if w != '']
         if i in [3, 4]:
             for j, word in enumerate(words):
@@ -727,9 +731,15 @@ def read_xrotor_wvel_file(fpath:str):
                 elif 'beta_tip' in word.lower():
                     data['beta_tip'] = float(words[j + 1])
                 elif 'power' in word.lower():
-                    data['power'] = float(words[j + 1])
+                    try:
+                        data['power'] = float(words[j + 1])
+                    except ValueError:
+                        data['power'] = np.nan
                 elif 'thrust' in word.lower():
-                    data['thrust'] = float(words[j + 1])
+                    try:
+                        data['thrust'] = float(words[j + 1])
+                    except ValueError:
+                        data['thrust'] = np.nan
         elif i == 6:
             headers = [ln.strip() for ln in line.replace(' + ', '+').split(' ') if ln != '']
             for header in headers:
@@ -747,7 +757,7 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
                      station_params: dict = None, design_adv: float = None, design_rpm: float = None,
                      design_thrust: float = None, design_power: float = None, n_radial: int = 50,
                      verbose: bool = False, show_station_fit_plots: bool = True, plot_after: bool = True,
-                     tmout: int = None, hide_windows: bool = True, geo_params: dict = {}):
+                     tmout: int = None, hide_windows: bool = True, geo_params: dict = {}, xrotor_verbose: bool = False):
     # adjust timeout for vrtx
     if tmout is None and design_vorform == 'vrtx':
         tmout = 100
@@ -777,12 +787,13 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
                      hub_wake_disp_br=hub_wake_disp_br, design_speed_mps=design_speed_mps, design_cl=design_cl,
                      design_atmo_props=design_atmo_props, design_vorform=design_vorform, design_adv=design_adv,
                      station_params=station_params, geo_params=geo_params, design_rpm=design_rpm,
-                     design_thrust=design_thrust, design_power=design_power)
+                     design_thrust=design_thrust, design_power=design_power, verbose=verbose)
     st_txt = prop.set_stations(plot_also=show_station_fit_plots, verbose=verbose)
 
     # prep XROTOR commands depending on what station_params were input
-    aero_params_fname = os.path.join(get_prop_db(), '{}_temp_section_params.txt'.format(name))
-    with open(aero_params_fname, 'w') as f:
+    aero_params_fname = '{}_temp_section_params.txt'.format(name)
+    aero_params_fpath = os.path.join(get_prop_db(), aero_params_fname)
+    with open(aero_params_fpath, 'w') as f:
         f.write(st_txt)
 
     # prep XROTOR commands depending on what design_atmo_props were given
@@ -856,11 +867,11 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
         blade_txt += 'o\n{}\nw\n{}\n'.format(key, fname)
 
     # prep XROTOR commands to save the solved operating point params
-    op_fpath = '{}.xrop'.format(name)
+    op_fpath = '{}\\{}.xrop'.format(name, name)
     save_op_txt = 'oper\nwrit\n{}\n'.format(op_fpath)
 
     # prep XROTOR commands for savename
-    savename = '{}.xrr'.format(name)
+    savename = '{}\\{}.xrr'.format(name, name)
     save_txt = 'save {}\nquit\n'.format(savename)
 
     # write XROTOR commands to a file and run in a subprocess
@@ -882,14 +893,17 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
             sui.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         if verbose:
             Info('Running XROTOR to create new geometry...')
-        subprocess.run([xrotor_fpath], startupinfo=sui, stdin=f, #stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
-                       timeout=tmout, cwd=os.path.join(get_prop_db(), name))
+        if xrotor_verbose:
+            subprocess.run([xrotor_fpath], startupinfo=sui, stdin=f, timeout=tmout, cwd=get_prop_db())
+        else:
+            subprocess.run([xrotor_fpath], startupinfo=sui, stdin=f, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                           timeout=tmout, cwd=get_prop_db())
     os.remove(xrotor_cmnd_file)
-    os.remove(aero_params_fname)
+    os.remove(aero_params_fpath)
 
     # set the prop's blade-data that we just saved in creation
     for key in blade_data.copy():
-        fp = os.path.join(get_prop_db(), '{}\\{}_out.txt'.format(name, key.replace('/', '_over_')))
+        fp = os.path.join(get_prop_db(), '{}_out.txt'.format(key.replace('/', '_over_')))
         roR, array = read_2col_file(fpath=fp)
         if 'r/R' not in blade_data:
             blade_data['r/R'] = roR
@@ -909,7 +923,7 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
     # save the PDT propeller meta-file, and then read in the operating point dictionary by calling load_from_savefile()
     prop.xrotor_op_dict = read_xrotor_op_file(prop.xrop_file)
     prop.save_meta_file()
-    prop.load_from_savefile()   # reads meta, xrr, xrop, and point clouds
+    prop.load_from_savefile(verbose=verbose)   # reads meta, xrr, xrop, and point clouds
 
     if not verbose:
         Info('"{}" Geometry Created!'.format(prop.name))
@@ -962,14 +976,16 @@ def convert_ps2png(ps_fpath: str, return_pil_img: bool = False, show_in_pyplot: 
 
 
 # =============== MODELING / PHYSICS ===============
-def calc_re(rho: float = None, vel: float = None, chord: float = None, mu: float = None, rpm: float = None,
-            radius: float = None, adv: float = None):
-    if all([i is not None for i in [rho, vel, chord, mu]]):
-        re = rho * vel * chord / mu
-    elif all([i is not None for i in [rho, rpm, radius, chord, mu]]):
+def calc_linear_re(rho: float, vel: float, length: float, mu: float):
+    return rho * vel * length / mu
+
+
+def calc_rotational_re(rho: float = None, vel: float = None, chord: float = None, mu: float = None, rpm: float = None,
+                       radius: float = None, adv: float = None):
+    if all([i is not None for i in [rho, rpm, radius, chord, mu]]):
         re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
     elif all([i is not None for i in [rho, vel, adv, radius, chord, mu]]):
-        rpm = vel / np.pi / 2 / radius / adv
+        rpm = vel / np.pi / 2 / radius / adv * 60
         re = rho * (rpm / 60 * 2 * np.pi) * radius * chord / mu
     else:
         raise Error('Must input all of either [rho, vel, chord, mu] or [rho, rpm, radius, chord, mu]')
@@ -1022,9 +1038,10 @@ def xrotor_drag_model(CL: np.ndarray, CDmin: float, CLCDmin: float, dCDdCL2: flo
 
 
 def get_xrotor_re_scaling_exp(re: int):     # THIS NEEDS WORK
-    re_pts = [0, 1e5, 2e5, 8e5, 2e6, 3e6]
-    f_pts = [-0.3, -0.5, -0.5, -1.5, -0.2, -0.1]
-    return np.interp(x=re, xp=re_pts, fp=f_pts)
+    # re_pts = [0, 1e5, 2e5, 8e5, 2e6, 3e6]
+    # f_pts = [-0.3, -0.5, -0.5, -1.5, -0.2, -0.1]
+    # return np.interp(x=re, xp=re_pts, fp=f_pts)
+    return -0.4
 
 
 def calc_thrust(k_t, rho, rpm, dia):
@@ -1057,13 +1074,16 @@ def generate_3D_profile_points(nondim_xy_coords: np.ndarray, radius: float, axis
     xp = xpts * np.cos(-b) + ypts * np.sin(-b)
     yp = ypts * np.cos(-b) - xpts * np.sin(-b)
 
-    # create array of radii points
+    # create array of radii points, create array of theta points
     rp = np.ones(len(xp)) * radius
+    thetas = xp / (2 * np.pi * radius) * 2 * np.pi    #map each xpos to a theta in radians
 
-    # rotate by the local skew angle
-    sk = np.deg2rad(skew_deg)
-    xs = rp * np.cos(sk) + xp * np.sin(sk)
-    ys = xp * np.cos(sk) - rp * np.sin(sk)
+    # apply skew
+    thetas += np.deg2rad(-skew_deg)
+
+    # wrap the ycoords
+    ys = rp * np.sin(thetas)
+    xs = rp * np.cos(thetas)
     zs = yp
 
     return np.vstack([xs, ys, zs])

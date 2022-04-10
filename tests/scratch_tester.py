@@ -1,31 +1,34 @@
 import propeller_design_tools as pdt
+import numpy as np
 
 
-# pdt.clear_foil_database(single_foil='clarky.dat', inside_root_db=False, inside_polar_db=True, inside_for_xfoil=True)
 pdt.start_ui()
 
-# prop = pdt.Propeller('MyPropeller')
-# oper_data = pdt.propeller.PropellerOperData(directory=r"C:\Users\Jake\Desktop\Python Projects\propeller_design_tools\propeller_design_tools\prop_database\MyPropeller\oper_data")
-# oper_data.load_oper_sweep_results()
-# prop.plot_oper_data(x_param='J', y_param='Efficiency')
-# prop.analyze_sweep(velo_vals=[15, 16, 17], sweep_param='power', sweep_vals=[200, 400, 600, 800, 1000], xrotor_verbose=True)
+# prop = pdt.Propeller('first_try_clarky', verbose=False)
+# sweep_kwargs = {
+#     'velo_vals': np.arange(.1, 1, 0.1),
+#     'sweep_param': 'thrust',
+#     'sweep_vals': np.arange(600, 2400, 150)
+# }
 
-
+# prop.clear_sweep_data()
+# prop.analyze_sweep(**sweep_kwargs)
+# prop.oper_data.plot(x_param='J', y_param='thrust(N)', family_param='speed(m/s)', iso_param='power(W)')
 
 # pdt.create_propeller(
-#     name='MyPropeller2',
-#     nblades=5,
-#     radius=0.1,
-#     hub_radius=0.018,
-#     hub_wake_disp_br=0.02,
-#     design_speed_mps=6,
-#     design_adv=None,
-#     design_rpm=20000,
-#     design_thrust=None,
-#     design_power=250,
-#     design_cl={'const': 0.2},
-#     design_atmo_props={'altitude_km': 1},
-#     design_vorform='vrtx',
-#     station_params={0.75: 'e855'},
-#     geo_params={'tot_skew': 0, 'n_prof_pts': None, 'n_profs': 50},
+#     name='first_try_clarky',
+#     nblades=3,
+#     radius=1,
+#     hub_radius=0.12,
+#     hub_wake_disp_br=0.12,
+#     design_speed_mps=.2,
+#     design_adv=.05,
+#     design_rpm=None,
+#     design_thrust=750,
+#     design_power=None,
+#     design_cl={'const': 0.5},
+#     design_atmo_props={'altitude_km': -1},
+#     design_vorform='pot',
+#     station_params={0.75: 'clarky'},
+#     geo_params={'tot_skew': 45, 'n_prof_pts': None, 'n_profs': 50},
 #     )

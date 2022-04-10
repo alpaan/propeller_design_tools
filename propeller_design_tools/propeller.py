@@ -1,13 +1,18 @@
 import os
+import shutil
 from propeller_design_tools import funcs
-from propeller_design_tools.user_io import Info, Error
+from propeller_design_tools.user_io import Info, Error, Warning
 from propeller_design_tools.settings import get_setting
 from propeller_design_tools.airfoil import Airfoil
+from propeller_design_tools.custom_opengl_classes import Custom3DAxis
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits import mplot3d
 import numpy as np
 from stl import mesh
+from typing import Union
+import pyqtgraph as pg
+import pyqtgraph.opengl as gl
 
 
 class Propeller(object):
@@ -19,25 +24,20 @@ class Propeller(object):
     saveload_attrs = {**creation_attrs, **{'name': str, 'meta_file': str, 'xrr_file': str, 'xrop_file': str,
                                            'blade_data': dict, 'blade_xyz_profiles': dict}}
 
-    def __init__(self, name, **kwargs):
-        # name is always given
+    def __init__(self, name, verbose: bool = True, **kwargs):
+        # name is always given, detect if it's a filepath
+        self.savepath = None
+        if os.path.exists(name):
+            self.savepath, name = os.path.split(name)
         self.name = name.replace('.txt', '')
         self.oper_data = None
         self.wvel_data = None
+        self.stl_mesh = None
 
         # check if the prop db exists
         prop_db = get_setting('propeller_database')
         if prop_db is None:
             raise Error(s='No Propeller Database is set!  First set one with "pdt.set_propeller_database(str)".')
-
-        # set the save folder attr
-        self.save_folder = os.path.join(prop_db, self.name)
-        self.meta_file = os.path.join(self.save_folder, '{}.meta'.format(self.name))
-        self.xrr_file = os.path.join(self.save_folder, '{}.xrr'.format(self.name))
-        self.xrop_file = os.path.join(self.save_folder, '{}.xrop'.format(self.name))
-        self.bld_prof_folder = os.path.join(self.save_folder, 'blade_profiles')
-        self.stl_mesh = None
-        self.stl_fpath = os.path.join(self.save_folder, '{}.stl'.format(self.name))
 
         # initialize all attrs to None for script auto-completion detection
         self.nblades, self.radius, self.hub_radius, self.hub_wake_disp_br, self.design_speed_mps, self.design_adv, \
@@ -48,8 +48,9 @@ class Propeller(object):
         # if no kwargs were given and there's a meta_file, load it
         if len(kwargs) == 0:
             if os.path.exists(self.meta_file):
-                Info(s='Loading propeller "meta-file" ({})'.format(self.meta_file))
-                self.load_from_savefile()
+                if verbose:
+                    Info(s='Loading propeller "meta-file" ({})'.format(self.meta_file))
+                self.load_from_savefile(verbose=verbose)
             else:
                 raise FileNotFoundError('Could not find file {}'.format(self.meta_file))
         else:  # cycle thru kwargs and set if they're valid, if not ignore them
@@ -61,9 +62,39 @@ class Propeller(object):
 
         # attempt to load any oper sweep data and any wvel sweep data
         self.oper_data = PropellerOperData(directory=self.oper_data_dir)
-        self.oper_data.load_oper_sweep_results()
+        self.oper_data.load_oper_sweep_results(verbose=verbose)
         self.wvel_data = PropellerWVelData(directory=self.wvel_data_dir)
-        self.wvel_data.load_wvel_sweep_results()
+        self.wvel_data.load_wvel_sweep_results(verbose=verbose)
+
+        # attempt to load any STL mesh data
+        self.load_stl_geometry(verbose=verbose)
+
+    @property
+    def stl_fpath(self):
+        return os.path.join(self.save_folder, '{}.stl'.format(self.name))
+
+    @property
+    def bld_prof_folder(self):
+        return os.path.join(self.save_folder, 'blade_profiles')
+
+    @property
+    def xrr_file(self):
+        return os.path.join(self.save_folder, '{}.xrr'.format(self.name))
+
+    @property
+    def xrop_file(self):
+        return os.path.join(self.save_folder, '{}.xrop'.format(self.name))
+
+    @property
+    def meta_file(self):
+        return os.path.join(self.save_folder, '{}.meta'.format(self.name))
+
+    @property
+    def save_folder(self):
+        if self.savepath is None:
+            return os.path.join(get_setting('propeller_database'), self.name)
+        else:
+            return os.path.join(self.savepath, self.name)
 
     @property
     def tot_skew(self):
@@ -113,6 +144,30 @@ class Propeller(object):
     @property
     def n_radial(self):
         return len(self.blade_xyz_profiles)
+
+    def save_as_new(self, new_name: str):
+        # store filepaths before we change name
+        old_xrop_file = self.xrop_file * 1
+        old_xrr_file = self.xrr_file * 1
+        old_blade_profs_folder = self.bld_prof_folder * 1
+
+        # change the name, make a new directory
+        self.name = new_name
+        if not os.path.exists(self.save_folder):
+            os.mkdir(self.save_folder)
+
+        # save off a new meta file, copy the xrop and xrr files
+        self.save_meta_file()
+        shutil.copyfile(old_xrop_file, self.xrop_file)
+        shutil.copyfile(old_xrr_file, self.xrr_file)
+
+        # blade profiles
+        if not os.path.exists(self.bld_prof_folder):
+            os.mkdir(self.bld_prof_folder)
+        for fname in [f for f in os.listdir(old_blade_profs_folder) if f.endswith('.txt')]:
+            fpath = os.path.join(old_blade_profs_folder, fname)
+            copypath = os.path.join(self.bld_prof_folder, fname)
+            shutil.copyfile(fpath, copypath)
 
     def read_pdt_metafile(self):
         # read in the PDT meta-file (in the root propeller database) and set Propeller attrs
@@ -218,21 +273,24 @@ class Propeller(object):
 
         return d
 
-    def load_from_savefile(self):
+    def load_from_savefile(self, verbose):
         # 1st set attrs from the PDT metafile
         self.read_pdt_metafile()
-        Info(s='Successfully read meta-file (.meta)!', indent_level=1)
+        if verbose:
+            Info(s='Successfully read meta-file (.meta)!', indent_level=1)
 
         # set the stations... why did I do it this way??
         self.set_stations(plot_also=False, verbose=True, from_loadsave_file=True)
 
         # then read in the XROTOR restart file (in the xrotor_geometry_files)
         self.xrotor_d = self.read_xrotor_restart()
-        Info(s='Successfully read XROTOR restart file (.xrr)!', indent_level=1)
+        if verbose:
+            Info(s='Successfully read XROTOR restart file (.xrr)!', indent_level=1)
 
         # then read the operating point output file (in xrotor_op_files)
         self.xrotor_op_dict = funcs.read_xrotor_op_file(fpath=self.xrop_file)
-        Info(s='Successfully read XROTOR operating-point file (.xrop)!', indent_level=1)
+        if verbose:
+            Info(s='Successfully read XROTOR operating-point file (.xrop)!', indent_level=1)
 
         # and finally read in the point cloud files
         self.blade_xyz_profiles = {}
@@ -241,7 +299,8 @@ class Propeller(object):
             prof_num = int(fname.replace('profile_', '').replace('.txt', ''))
             xyz_prof = funcs.read_profile_xyz(fpath=os.path.join(self.bld_prof_folder, fname))
             self.blade_xyz_profiles[prof_num] = xyz_prof
-        Info(s='Successfully read blade profiles!', indent_level=1)
+        if verbose:
+            Info(s='Successfully read blade profiles!', indent_level=1)
 
         return
 
@@ -291,19 +350,30 @@ class Propeller(object):
         betas = np.array(self.xrotor_d['Beta0deg'])
         le_pts = []
         te_pts = []
-        ang = np.deg2rad(rotate_deg)
         for radius, chord, beta in zip(radii, chords, betas):
-            chord_proj = chord * np.cos(np.deg2rad(beta))
-            dz = chord * np.sin(np.deg2rad(beta))
-            x_center = radius * np.cos(ang)
-            y_center = radius * np.sin(ang)
-            x_le = x_center - np.sin(ang) * axis_shift * chord_proj
-            x_te = x_center + np.sin(ang) * (1 - axis_shift) * chord_proj
-            y_le = y_center + np.cos(ang) * axis_shift * chord_proj
-            y_te = y_center - np.cos(ang) * (1 - axis_shift) * chord_proj
-            le_pts.append([x_le, y_le, dz * axis_shift])
-            te_pts.append([x_te, y_te, -dz * (1 - axis_shift)])
+            le_te_coords = np.array([[0.0, 1.0], [0.0, 0.0]])
+            xs, ys, zs = funcs.generate_3D_profile_points(nondim_xy_coords=le_te_coords, radius=radius,
+                                                            axis_shift=axis_shift, chord_len=chord, beta_deg=beta,
+                                                            skew_deg=rotate_deg)
+            le_pts.append([xs[0], ys[0], zs[0]])
+            te_pts.append([xs[1], ys[1], zs[1]])
         return le_pts, te_pts
+
+    def get_blade_chordlines(self, rotate_deg: float, axis_shift: float = 0.25, npts: int = 50):
+        radii = self.radius * np.array(self.xrotor_d['r/R'])
+        chords = self.radius * np.array(self.xrotor_d['C/R'])
+        betas = np.array(self.xrotor_d['Beta0deg'])
+        chordlines = []
+        for radius, chord, beta in zip(radii, chords, betas):
+            xs = np.linspace(0, 1, npts)
+            ys = np.zeros(len(xs))
+            chordline_nondim = np.vstack([xs, ys])
+            xs, ys, zs = funcs.generate_3D_profile_points(nondim_xy_coords=chordline_nondim, radius=radius,
+                                                   axis_shift=axis_shift, chord_len=chord, beta_deg=beta,
+                                                   skew_deg=rotate_deg)
+            coords = list(zip(xs, ys, zs))
+            chordlines.append(coords)
+        return chordlines
 
     def interp_foil_profiles(self, n_prof_pts: int = None, n_profs: int = 50, tot_skew: float = 0.0):
 
@@ -562,10 +632,10 @@ class Propeller(object):
         # plot stations
         if chords_betas:
             for ang in angles:
-                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
-                for le_pt, te_pt in zip(le_pts, te_pts):
-                    station_line, = ax3d.plot3D(xs=[le_pt[0], te_pt[0]], ys=[le_pt[1], te_pt[1]], zs=[le_pt[2], te_pt[2]],
-                                                c='rosybrown', lw=1, ls='--')
+                chordlines = self.get_blade_chordlines(rotate_deg=ang)
+                for line in chordlines:
+                    xs, ys, zs = zip(*line)
+                    station_line, = ax3d.plot3D(xs=xs, ys=ys, zs=zs, c='rosybrown', lw=1, ls='--')
         else:
             station_line = None
 
@@ -625,6 +695,97 @@ class Propeller(object):
 
         return fig
 
+    def plot_gl3d_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
+                            input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False, fig=None):
+        pg.mkQApp()
+        self.view = view = gl.GLViewWidget()
+        view.setFixedSize(1280, 720)
+        view.show()
+
+        blades = np.arange(self.xrotor_d['Nblds'])
+        angles = 360 / self.xrotor_d['Nblds'] * blades
+
+        # plot le and te lines
+        if LE:
+            for ang in angles:
+                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+                le_line = gl.GLLinePlotItem(pos=le_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
+                                            mode='line_strip')
+                view.addItem(le_line)
+
+        if TE:
+            for ang in angles:
+                le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+                te_line = gl.GLLinePlotItem(pos=te_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
+                                            mode='line_strip')
+                view.addItem(te_line)
+
+        # plot stations
+        if chords_betas:
+            for ang in angles:
+                chordlines = self.get_blade_chordlines(rotate_deg=ang)
+                for line in chordlines:
+                    station_line = gl.GLLinePlotItem(pos=line, color=[i / 255 for i in [245, 66, 66, 255]],
+                                                     width=2, antialias=False, mode='line_strip')
+                    view.addItem(station_line)
+
+        # plot station_params
+        if input_stations:
+            radii = self.xrotor_d['r/R'] * self.radius
+            chords = self.xrotor_d['C/R'] * self.radius
+            betas = self.xrotor_d['Beta0deg'].copy()
+            for roR, foil_name in self.station_params.items():
+                # station dimensionalized parameters
+                r = roR * self.radius
+                ch = np.interp(r, radii, chords)
+                beta = np.interp(r, radii, betas)
+                sk = self.geo_params['tot_skew'] * roR
+
+                # load the foil, shift, flip, and dimensionalize coordinates
+                foil = Airfoil(foil_name, verbose=False)
+                xc, yc, zc = funcs.generate_3D_profile_points(nondim_xy_coords=foil.get_coords(), radius=r,
+                                                              axis_shift=0.25, chord_len=ch, beta_deg=beta,
+                                                              skew_deg=sk)
+                coords = list(zip(xc, yc, zc))
+                foils_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [5, 0, 163, 255]], width=2, antialias=False,
+                                               mode='line_strip')
+                view.addItem(foils_line)
+
+        # plot interpolated profiles
+        if interp_profiles:
+            for prof_num, prof_xyz in self.blade_xyz_profiles.items():
+                xc, yc, zc = prof_xyz
+                coords = list(zip(xc, yc, zc))
+                prof_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [163, 0, 0, 200]], width=2,
+                                              antialias=False, mode='line_strip')
+                view.addItem(prof_line)
+
+        # plot hub
+        if hub:
+            hub_thickness = abs(max([pt[2] for pt in le_pts]) - min([pt[2] for pt in te_pts]))
+            theta = np.linspace(0, np.pi * 2, 50)
+            hub_x = np.cos(theta) * self.hub_radius
+            hub_y = np.sin(theta) * self.hub_radius
+            top_zs = np.ones(len(hub_x)) * hub_thickness / 2
+            bot_zs = -np.ones(len(hub_x)) * hub_thickness / 2
+            hub_line = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, top_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
+                                         antialias=False, mode='line_strip')
+            view.addItem(hub_line)
+            hub_line_bot = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, bot_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
+                                                          antialias=False, mode='line_strip')
+            view.addItem(hub_line_bot)
+
+        # finish up formatting stuff
+        lim = self.radius * 2.5
+        view.setCameraPosition(distance=lim, azimuth=-90)
+        zgrid = gl.GLGridItem()
+        zgrid.setSize(2, 2, 2)
+        zgrid.setSpacing(.2, .2, .2)
+        zgrid.translate(0, 0, -0.5)
+        view.addItem(zgrid)
+
+        return view
+
     def generate_stl_geometry(self, plot_after: bool = True, verbose: bool = True):
         n_prof = len(self.blade_xyz_profiles)
         n_pts = np.max(np.shape(self.blade_xyz_profiles[0]))
@@ -660,6 +821,15 @@ class Propeller(object):
         if plot_after:
             self.plot_stl_mesh()
 
+    def load_stl_geometry(self, verbose: bool = True):
+        if os.path.exists(self.stl_fpath):
+            self.stl_mesh = mesh.Mesh.from_file(self.stl_fpath)
+            if verbose:
+                Info('Loaded STL mesh data from file: {}'.format(self.stl_fpath))
+        else:
+            if verbose:
+                Warning('STL file does not exist, use "generate_stl_geometry()" first')
+
     def plot_stl_mesh(self):
         self.stl_fig = fig = plt.figure(figsize=(10, 8))
         ax3d = fig.add_subplot(projection='3d')
@@ -668,6 +838,7 @@ class Propeller(object):
         ax3d.add_collection3d(mplot3d.art3d.Poly3DCollection(self.stl_mesh.vectors))
         scale = self.stl_mesh.points.flatten()
         ax3d.auto_scale_xyz(scale, scale, scale)
+        return fig
 
     def plot_ideal_eff(self):
         Info('"{}" ideal efficiency: {:.1f}%'.format(self.name, self.ideal_eff))
@@ -693,58 +864,32 @@ class Propeller(object):
                 count += 1
                 if verbose:
                     Info('Analyzing sweep point # {} / {}'.format(count, total_pnts))
-                funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=self.design_vorform, velo=velo_val,
-                                      xrotor_verbose=xrotor_verbose, **{sweep_param: val})
+                try:
+                    funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=self.design_vorform, velo=velo_val,
+                                          xrotor_verbose=xrotor_verbose, **{sweep_param: val})
+                except Error as e:
+                    Warning('Failed to get XROTOR oper results for vel={}, {}={}\n{}'.format(velo_val, sweep_param, val, e))
+                    pass
+
+        self.oper_data.load_oper_sweep_results()
+        self.wvel_data.load_wvel_sweep_results()
         if verbose:
             Info('Done!')
 
-    def plot_oper_data(self, x_param: str, y_param: str, **plot_kwargs):
-        valid_x_params = ['adv. ratio', 'J', 'speed(m/s)', 'rpm']
-        valid_y_params = ['thrust(N)', 'power(W)', 'torque(N-m)', 'Efficiency', 'Eff induced',
-                          'Eff ideal', 'Pvisc(W)', 'Ct', 'Tc', 'Cp', 'Pc', 'Sigma']
-
-        if x_param not in valid_x_params:
-            raise Error('x_param "{}" is not one of the valid params ("adv. ratio", "J", "speed(m/s)", "rpm")'.format(x_param))
-        if y_param not in valid_y_params:
-            raise Error('y_param "{}" is not one of the valid params ("thrust(N)", "power(W)", "torque(N-m)", '
-                        '"Efficiency", "Eff induced", "Eff ideal", "Pvisc(W)", "Ct" ,"Tc", "Cp", "Pc", "Sigma")'
-                        .format(y_param))
-
-        fig = plt.figure(figsize=[10, 8])
-        ax = fig.add_subplot(111)
-        ax.grid(True)
-        ax.set_title('{} Sweep Results'.format(self.name))
-        ax.set_xlabel(x_param)
-        ax.set_ylabel(y_param)
-
-        if x_param in ['rpm', 'adv. ratio', 'J']:  # families of velo
-            for vel in self.oper_data.get_unique_velos():
-                x_vals, y_vals = [], []
-                for rpm in self.oper_data.get_unique_rpms():
-                    if (vel, rpm) in self.oper_data.datapoints:
-                        datapoint = self.oper_data.datapoints[(vel, rpm)]
-                        x_vals.append(datapoint[x_param])
-                        y_vals.append(datapoint[y_param])
-                        lbl_txt = '{}'.format(vel)
-                ax.plot(x_vals, y_vals, '-o', label=lbl_txt)
-                ax.legend(loc='best', title='Speed(m/s)')
-        else:  # families of rpm
-            for rpm in self.oper_data.get_unique_rpms():
-                x_vals, y_vals = [], []
-                for vel in self.oper_data.get_unique_velos():
-                    if (vel, rpm) in self.oper_data.datapoints:
-                        datapoint = self.oper_data.datapoints[(vel, rpm)]
-                        x_vals.append(datapoint[x_param])
-                        y_vals.append(datapoint[y_param])
-                        lbl_txt = '{}'.format(rpm)
-                ax.plot(x_vals, y_vals, '-o', label=lbl_txt)
-                ax.legend(loc='best', title='RPMs')
+    def clear_sweep_data(self):
+        if os.path.exists(self.oper_data_dir):
+            shutil.rmtree(self.oper_data_dir)
+            Info('Removed {} and its contents'.format(self.oper_data_dir))
+        if os.path.exists(self.wvel_data_dir):
+            shutil.rmtree(self.wvel_data_dir)
+            Info('Removed {} and its contents'.format(self.wvel_data_dir))
 
 
 class PropellerOperData:
     def __init__(self, directory: str):
         self.directory = directory
         self.datapoints = None
+        self.prop_name = os.path.split(os.path.split(self.directory)[0])[1]
 
     def get_oper_files(self, fullpath: bool = True):
         if os.path.exists(self.directory):
@@ -763,29 +908,64 @@ class PropellerOperData:
             vel_key /= 100
             oper_fullpath = os.path.join(self.directory, fname)
             d[(vel_key, rpm_key)] = funcs.read_xrotor_op_file(fpath=oper_fullpath)
-        if verbose:
+        if verbose and len(fnames) > 0:
             Info('Loaded Existing Oper Results (.oper)!', indent_level=1)
 
-    def get_unique_velos(self):
-        uniq_velos = []
-        for key in self.datapoints:
-            if key[0] not in uniq_velos:
-                uniq_velos.append(key[0])
-        return list(sorted(uniq_velos))
-
-    def get_unique_rpms(self):
-        uniq_rpms = []
-        for key in self.datapoints:
-            if key[1] not in uniq_rpms:
-                uniq_rpms.append(key[1])
-        return list(sorted(uniq_rpms))
-
-    def get_unique_advas(self):
-        uniq_advas = []
+    def get_unique_param(self, param: str):
+        uniq_vals = []
         for val in self.datapoints.values():
-            if val['adv. ratio'] not in uniq_advas:
-                uniq_advas.append(val['adv. ratio'])
-        return list(sorted(uniq_advas))
+            if val[param] not in uniq_vals:
+                uniq_vals.append(val[param])
+        return list(sorted(uniq_vals))
+
+    def get_datapoints_by_paramval(self, param: str, val: Union[float, int]):
+        pnts = []
+        for key, dp in self.datapoints.items():
+            if dp[param] == val:
+                pnts.append(dp)
+        return pnts
+
+    def plot(self, x_param: str, y_param: str, family_param: str, iso_param: str = None, **plot_kwargs):
+        valid_x_params = ['adv. ratio', 'J', 'speed(m/s)', 'rpm', ]
+        valid_y_params = ['thrust(N)', 'power(W)', 'torque(N-m)', 'Efficiency', 'Eff induced',
+                          'Eff ideal', 'Pvisc(W)', 'Ct', 'Tc', 'Cp', 'Pc', 'Sigma']
+        valid_params = valid_x_params + valid_y_params
+
+        if x_param not in valid_params:
+            raise Error('x_param "{}" is not one of the valid params ("adv. ratio", "J", "speed(m/s)", "rpm")'.format(x_param))
+        if y_param not in valid_params:
+            raise Error('y_param "{}" is not one of the valid params ("thrust(N)", "power(W)", "torque(N-m)", '
+                        '"Efficiency", "Eff induced", "Eff ideal", "Pvisc(W)", "Ct" ,"Tc", "Cp", "Pc", "Sigma")'
+                        .format(y_param))
+        if family_param not in valid_params:
+            raise Error('family_param error')
+
+        fig = plt.figure(figsize=[10, 8])
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        ax.set_title('{} Sweep Results'.format(self.prop_name))
+        ax.set_xlabel(x_param)
+        ax.set_ylabel(y_param)
+
+        fvals = self.get_unique_param(param=family_param)
+        for fval in fvals:
+            datapts = self.get_datapoints_by_paramval(param=family_param, val=fval)
+            xvals = [dp[x_param] for dp in datapts]
+            yvals = [dp[y_param] for dp in datapts]
+            xvals, yvals = zip(*sorted(zip(xvals, yvals)))
+            ax.plot(xvals, yvals, '-o', label='{}'.format(fval))
+
+        if iso_param is not None:
+            ivals = self.get_unique_param(param=iso_param)
+            for ival in ivals:
+                datapts = self.get_datapoints_by_paramval(param=iso_param, val=ival)
+                if len(datapts) > 1:
+                    xvals = [dp[x_param] for dp in datapts]
+                    yvals = [dp[y_param] for dp in datapts]
+                    ax.plot(xvals, yvals, '--', label='{}'.format(ival))
+
+        leg_title = '{} /\n{}'.format(family_param, iso_param) if iso_param is not None else '{}'.format(family_param)
+        ax.legend(title=leg_title, loc='best')
 
 
 class PropellerWVelData:
@@ -810,5 +990,5 @@ class PropellerWVelData:
             vel_key /= 100
             wvel_fullpath = os.path.join(self.directory, fname)
             d[(vel_key, rpm_key)] = funcs.read_xrotor_wvel_file(fpath=wvel_fullpath)
-        if verbose:
+        if verbose and len(fnames) > 0:
             Info('Loaded Existing WVel Results (.wvel)!', indent_level=1)
