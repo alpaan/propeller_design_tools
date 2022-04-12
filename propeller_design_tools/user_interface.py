@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import subprocess
 from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.settings import _get_cursor_fpath, _get_gunshot_fpaths
 from propeller_design_tools.funcs import get_all_airfoil_files, get_all_propeller_dirs
@@ -92,14 +93,17 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
 
         # connecting signals
         self.af_db_select_widg.currentDatabaseChanged.connect(self.repop_select_foil_cb)
-        self.af_widg.add_foil_data_widg.add_btn.clicked.connect(self.add_foil_data_btn_clicked)
-        self.af_widg.add_foil_data_widg.reset_btn.clicked.connect(self.reset_foil_ranges_btn_clicked)
-        self.af_widg.select_foil_cb.currentTextChanged.connect(self.select_foil_cb_changed)
-        self.af_widg.af_yax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
-        self.af_widg.af_xax_cb.currentTextChanged.connect(self.af_metric_cb_changed)
-
         self.prop_db_select_widg.currentDatabaseChanged.connect(self.repop_select_prop_cb)
 
+    def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
+        menu = QtWidgets.QMenu(self)
+        open_foil_db_act = menu.addAction('Open Foil Database in Explorer')
+        open_prop_db_act = menu.addAction('Open Propeller Database in Explorer')
+        action = menu.exec_(self.mapToGlobal(event.pos()))
+        if action == open_foil_db_act:
+            self.open_foil_db_action()
+        elif action == open_prop_db_act:
+            self.open_prop_db_action()
 
     def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
         fpaths = _get_gunshot_fpaths()
@@ -112,141 +116,32 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         player.setVolume(20)
         player.play()
 
+    def open_foil_db_action(self):
+        foil_db = self.af_db_select_widg.get_existing_setting()
+        if os.path.exists(foil_db):
+            subprocess.Popen('explorer "{}"'.format(os.path.normpath(foil_db)))
+
+    def open_prop_db_action(self):
+        prop_db = self.prop_db_select_widg.get_existing_setting()
+        if os.path.exists(prop_db):
+            subprocess.Popen('explorer "{}"'.format(os.path.normpath(prop_db)))
+
     def repop_select_prop_cb(self):
-        self.print('Changing Propeller Database...')
+        self.print('Repopulating propeller dropdowns...')
         self.prop_widg.plot3d_widg.populate_select_prop_cb()
+        self.prop_sweep_widg.select_prop_cb.pop_select_prop_cb()
 
     def repop_select_foil_cb(self):
-        self.print('Changing Airfoil Database...')
+        self.print('Repopulating foil dropdown...')
         self.af_widg.select_foil_cb.clear()
         self.af_widg.select_foil_cb.addItems(['None'] + get_all_airfoil_files())
-
-    def af_metric_cb_changed(self):
-        self.af_widg.foil_metric_canvas.axes.clear()
-        self.af_widg.foil_metric_canvas.draw()
-        y_txt, x_txt = self.af_widg.af_yax_cb.currentText(), self.af_widg.af_xax_cb.currentText()
-        if y_txt == 'y-axis' or x_txt == 'x-axis':
-            return
-
-        if self.foil is not None:
-            if len(self.foil.polar_data) == 0:
-                self.print('No data for current foil')
-                return
-
-            with Capturing() as output:
-                self.foil.plot_polar_data(x_param=x_txt, y_param=y_txt, fig=self.af_widg.foil_metric_canvas.figure)
-            self.console_te.append('\n'.join(output) if len(output) > 0 else '')
-
-            self.af_widg.foil_metric_canvas.draw()
 
     def clear_console_btn_clicked(self):
         self.prog_bar.setValue(0)
         self.console_te.clear()
 
-    def select_foil_cb_changed(self, foil_txt):
-        self.print('Changing Current Foil...')
-        self.af_widg.foil_xy_canvas.axes.clear()
-        if not foil_txt == 'None':
-            try:
-
-                with Capturing() as output:
-                    self.foil = Airfoil(name=foil_txt, exact_namematch=True)
-                self.console_te.append('\n'.join(output))
-
-            except Exception as e:
-                with Capturing() as output:
-                    self.print(e)
-                self.console_te.append('\n'.join(output))
-                self.foil = None
-        else:
-            self.foil = None
-
-        if self.foil is not None:
-            self.foil.plot_geometry(fig=self.af_widg.foil_xy_canvas.figure)
-            self.af_metric_cb_changed()  # updates the metric plot
-        else:
-            self.af_widg.foil_xy_canvas.axes.clear()
-            self.af_widg.foil_metric_canvas.axes.clear()
-        self.af_widg.foil_xy_canvas.draw()
-        self.af_widg.foil_metric_canvas.draw()
-        self.af_widg.exist_data_widg.update_airfoil(af=self.foil)
-
-    def add_foil_data_btn_clicked(self):
-
-        if self.foil is None:
-            self.print('Must select a foil first!')
-            return
-
-        self.prog_bar.setValue(0)
-
-        re_min, re_max, re_step = self.af_widg.add_foil_data_widg.get_re_range()
-        mach_min, mach_max, mach_step = self.af_widg.add_foil_data_widg.get_mach_range()
-        ncrit_min, ncrit_max, ncrit_step = self.af_widg.add_foil_data_widg.get_ncrit_range()
-
-        res = np.arange(re_min, re_max, re_step)
-        machs = np.arange(mach_min, mach_max, mach_step)
-        ncrits = np.arange(ncrit_min, ncrit_max, ncrit_step)
-
-        self.thread = QtCore.QThread()
-        self.foil_worker = AddFoilDataWorker(foil=self.foil, res=res, machs=machs, ncrits=ncrits)
-        self.foil_worker.moveToThread(self.thread)
-        self.thread.started.connect(self.foil_worker.run)
-        self.foil_worker.finished.connect(self.thread.quit)
-        self.foil_worker.finished.connect(self.foil_worker.deleteLater)
-        self.foil_worker.finished.connect(self.on_foil_worker_finish)
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.foil_worker.progress.connect(self.update_foil_worker_progress)
-
-        self.af_widg.add_foil_data_widg.setEnabled(False)
-        self.af_widg.exist_data_widg.setEnabled(False)
-        self.af_widg.select_foil_cb.setEnabled(False)
-        self.thread.start()
-
-    def on_foil_worker_finish(self):
-        self.af_widg.add_foil_data_widg.setEnabled(True)
-        self.af_widg.exist_data_widg.setEnabled(True)
-        self.af_widg.select_foil_cb.setEnabled(True)
-        self.prog_bar.setValue(0)
-
-    def update_foil_worker_progress(self, prog: int, output: list):
-        self.print(output)
-        self.prog_bar.setValue(prog)
-        with Capturing() as output:
-            self.foil.load_polar_data()
-        self.print(output)
-        self.select_foil_cb_changed(foil_txt=self.af_widg.select_foil_cb.currentText())  # updates everything
-
-    def reset_foil_ranges_btn_clicked(self):
-        self.af_widg.add_foil_data_widg.reset_ranges()
-
     def print(self, s: str, fontfamily: str = None):
         self.printer.print(s, fontfamily=fontfamily)
-
-
-class AddFoilDataWorker(QtCore.QObject):
-    finished = QtCore.pyqtSignal()
-    progress = QtCore.pyqtSignal(int, list)
-
-    def __init__(self, foil: 'Airfoil', res: list, machs: list, ncrits: list):
-        super(AddFoilDataWorker, self).__init__()
-        self.foil = foil
-        self.res = res
-        self.machs = machs
-        self.ncrits = ncrits
-
-    def run(self):
-        total_polars = len(self.res) * len(self.machs) * len(self.ncrits)
-
-        counter = 0
-        for re in self.res:
-            for mach in self.machs:
-                for ncrit in self.ncrits:
-                    counter += 1
-                    with Capturing() as output:
-                        self.foil.calculate_xfoil_polars(re=[re], mach=[mach], ncrit=[ncrit])
-                    self.progress.emit(int(counter / total_polars * 100), output)
-
-        self.finished.emit()
 
 
 if __name__ == '__main__':

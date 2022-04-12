@@ -4,7 +4,7 @@ from propeller_design_tools import funcs
 from propeller_design_tools.user_io import Info, Error, Warning
 from propeller_design_tools.settings import get_setting
 from propeller_design_tools.airfoil import Airfoil
-from propeller_design_tools.custom_opengl_classes import Custom3DAxis
+from propeller_design_tools.settings import VALID_OPER_PLOT_PARAMS
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits import mplot3d
@@ -144,6 +144,10 @@ class Propeller(object):
     @property
     def n_radial(self):
         return len(self.blade_xyz_profiles)
+
+    @property
+    def valid_oper_plot_params(self):
+        return
 
     def save_as_new(self, new_name: str):
         # store filepaths before we change name
@@ -488,10 +492,10 @@ class Propeller(object):
             # plot stations
             if chords_betas:
                 for ang in angles:
-                    le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
-                    for le_pt, te_pt in zip(le_pts, te_pts):
-                        station_line, = ax3d.plot3D(xs=[le_pt[0], te_pt[0]], ys=[le_pt[1], te_pt[1]], zs=[le_pt[2], te_pt[2]],
-                                                    c='rosybrown', lw=1, ls='--')
+                    chordlines = self.get_blade_chordlines(rotate_deg=ang)
+                    for line in chordlines:
+                        xs, ys, zs = zip(*line)
+                        station_line, = ax3d.plot3D(xs=xs, ys=ys, zs=zs, c='rosybrown', lw=1, ls='--')
             else:
                 station_line = None
 
@@ -698,7 +702,7 @@ class Propeller(object):
     def plot_gl3d_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
                             input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False, fig=None):
         pg.mkQApp()
-        self.view = view = gl.GLViewWidget()
+        self.gl_geo_view = view = gl.GLViewWidget()
         view.setFixedSize(1280, 720)
         view.show()
 
@@ -786,6 +790,72 @@ class Propeller(object):
 
         return view
 
+    def plot_gl3d_wvel_data(self, view=None):
+        if view is None:
+            pg.mkQApp()
+            self.gl_wvel_view = view = gl.GLViewWidget()
+            view.setFixedSize(1280, 720)
+            view.show()
+        else:
+            pass
+
+        blades = np.arange(self.xrotor_d['Nblds'])
+        angles = 360 / self.xrotor_d['Nblds'] * blades
+
+        # plot le and te lines
+        for ang in angles:
+            le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+            le_line = gl.GLLinePlotItem(pos=le_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
+                                        mode='line_strip')
+            view.addItem(le_line)
+
+        for ang in angles:
+            le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
+            te_line = gl.GLLinePlotItem(pos=te_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
+                                        mode='line_strip')
+            view.addItem(te_line)
+
+        # plot stations
+        for ang in angles:
+            chordlines = self.get_blade_chordlines(rotate_deg=ang)
+            for line in chordlines:
+                station_line = gl.GLLinePlotItem(pos=line, color=[i / 255 for i in [245, 66, 66, 255]],
+                                                 width=2, antialias=False, mode='line_strip')
+                view.addItem(station_line)
+
+        # plot interpolated profiles
+        for prof_num, prof_xyz in self.blade_xyz_profiles.items():
+            xc, yc, zc = prof_xyz
+            coords = list(zip(xc, yc, zc))
+            prof_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [163, 0, 0, 200]], width=2,
+                                          antialias=False, mode='line_strip')
+            view.addItem(prof_line)
+
+        # plot hub
+        hub_thickness = abs(max([pt[2] for pt in le_pts]) - min([pt[2] for pt in te_pts]))
+        theta = np.linspace(0, np.pi * 2, 50)
+        hub_x = np.cos(theta) * self.hub_radius
+        hub_y = np.sin(theta) * self.hub_radius
+        top_zs = np.ones(len(hub_x)) * hub_thickness / 2
+        bot_zs = -np.ones(len(hub_x)) * hub_thickness / 2
+        hub_line = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, top_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
+                                     antialias=False, mode='line_strip')
+        view.addItem(hub_line)
+        hub_line_bot = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, bot_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
+                                         antialias=False, mode='line_strip')
+        view.addItem(hub_line_bot)
+
+        # finish up formatting stuff
+        lim = self.radius * 2.5
+        view.setCameraPosition(distance=lim, azimuth=-90)
+        zgrid = gl.GLGridItem()
+        zgrid.setSize(2, 2, 2)
+        zgrid.setSpacing(.2, .2, .2)
+        zgrid.translate(0, 0, -0.5)
+        view.addItem(zgrid)
+
+        return view
+
     def generate_stl_geometry(self, plot_after: bool = True, verbose: bool = True):
         n_prof = len(self.blade_xyz_profiles)
         n_pts = np.max(np.shape(self.blade_xyz_profiles[0]))
@@ -851,9 +921,11 @@ class Propeller(object):
                               torque=torque, power=power, velo=velo, xrotor_verbose=xrotor_verbose)
 
     def analyze_sweep(self, velo_vals: list, sweep_param: str, sweep_vals: list, verbose: bool = True,
-                      xrotor_verbose: bool = False):
+                      xrotor_verbose: bool = False, vorform: str = None):
         if sweep_param not in ['adva', 'rpm', 'thrust', 'power', 'torque']:
             raise Error('"sweep_param" must be one of ("adva", "rpm", "thrust", "power", "torque")')
+
+        vorform = self.design_vorform if vorform is None else vorform
 
         total_pnts = len(velo_vals) * len(sweep_vals)
         if verbose:
@@ -865,7 +937,7 @@ class Propeller(object):
                 if verbose:
                     Info('Analyzing sweep point # {} / {}'.format(count, total_pnts))
                 try:
-                    funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=self.design_vorform, velo=velo_val,
+                    funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=vorform, velo=velo_val,
                                           xrotor_verbose=xrotor_verbose, **{sweep_param: val})
                 except Error as e:
                     Warning('Failed to get XROTOR oper results for vel={}, {}={}\n{}'.format(velo_val, sweep_param, val, e))
@@ -925,11 +997,36 @@ class PropellerOperData:
                 pnts.append(dp)
         return pnts
 
-    def plot(self, x_param: str, y_param: str, family_param: str, iso_param: str = None, **plot_kwargs):
-        valid_x_params = ['adv. ratio', 'J', 'speed(m/s)', 'rpm', ]
-        valid_y_params = ['thrust(N)', 'power(W)', 'torque(N-m)', 'Efficiency', 'Eff induced',
-                          'Eff ideal', 'Pvisc(W)', 'Ct', 'Tc', 'Cp', 'Pc', 'Sigma']
-        valid_params = valid_x_params + valid_y_params
+    def plot(self, x_param: str, y_param: str, family_param: str = None, iso_param: str = None, fig=None, **plot_kwargs):
+        params = [x_param, y_param, family_param, iso_param]
+        valid_params = VALID_OPER_PLOT_PARAMS
+        valid_params_lower = [s.lower() for s in valid_params]
+
+        if len(self.datapoints) == 0:
+            return
+
+        for i, param in enumerate(params):
+            if param is not None:
+                if param.lower() in valid_params_lower:
+                    params[i] = valid_params[valid_params_lower.index(param.lower())]
+                if param.lower() in ['adv', 'adv.', 'adva', 'adv. ratio', 'adv.ratio']:
+                    params[i] = 'adv. ratio'
+                elif param.lower() in ['speed', 'speed(m/s)', 'vel', 'velocity', 'speed_mps']:
+                    params[i] = 'speed(m/s)'
+                elif param.lower() in ['thrust', 'thrust(n)', 'thrust (n)']:
+                    params[i] = 'thrust(N)'
+                elif param.lower() in ['power', 'power(w)', 'power (w)']:
+                    params[i] = 'power(W)'
+                elif param.lower() in ['torque(n-m)', 'torque', 'torque (n-m)']:
+                    params[i] = 'torque(N-m)'
+                elif param.lower() in ['eff', 'efficiency', 'Efficiency']:
+                    params[i] = 'Efficiency'
+                elif param.lower() in ['pvisc(w)', 'pvisc (w)', 'pvisc']:
+                    params[i] = 'Pvisc(W)'
+            else:
+                params[i] = None
+
+        x_param, y_param, family_param, iso_param = params
 
         if x_param not in valid_params:
             raise Error('x_param "{}" is not one of the valid params ("adv. ratio", "J", "speed(m/s)", "rpm")'.format(x_param))
@@ -937,35 +1034,50 @@ class PropellerOperData:
             raise Error('y_param "{}" is not one of the valid params ("thrust(N)", "power(W)", "torque(N-m)", '
                         '"Efficiency", "Eff induced", "Eff ideal", "Pvisc(W)", "Ct" ,"Tc", "Cp", "Pc", "Sigma")'
                         .format(y_param))
-        if family_param not in valid_params:
+        if family_param not in valid_params and family_param is not None:
             raise Error('family_param error')
+        if iso_param not in valid_params and iso_param is not None:
+            raise Error('iso_param error')
 
-        fig = plt.figure(figsize=[10, 8])
-        ax = fig.add_subplot(111)
+        if fig is None:
+            fig = plt.figure(figsize=[10, 8])
+            ax = fig.add_subplot(111)
+        else:
+            ax = fig.axes[0]
+
         ax.grid(True)
         ax.set_title('{} Sweep Results'.format(self.prop_name))
         ax.set_xlabel(x_param)
         ax.set_ylabel(y_param)
 
-        fvals = self.get_unique_param(param=family_param)
-        for fval in fvals:
-            datapts = self.get_datapoints_by_paramval(param=family_param, val=fval)
+        if family_param is not None:
+            fvals = self.get_unique_param(param=family_param)
+            for fval in fvals:
+                datapts = self.get_datapoints_by_paramval(param=family_param, val=fval)
+                xvals = [dp[x_param] for dp in datapts]
+                yvals = [dp[y_param] for dp in datapts]
+                xvals, yvals = zip(*sorted(zip(xvals, yvals)))
+                ax.plot(xvals, yvals, '-o', label='{}'.format(fval))
+
+            if iso_param is not None:
+                ivals = self.get_unique_param(param=iso_param)
+                for ival in ivals:
+                    datapts = self.get_datapoints_by_paramval(param=iso_param, val=ival)
+                    if len(datapts) > 1:
+                        xvals = [dp[x_param] for dp in datapts]
+                        yvals = [dp[y_param] for dp in datapts]
+                        ax.plot(xvals, yvals, '--', label='{}'.format(ival))
+
+            leg_title = '{} /\n{}'.format(family_param, iso_param) if iso_param is not None else '{}'.format(family_param)
+            ax.legend(title=leg_title, loc='best')
+        else:
+            datapts = self.datapoints.values()
             xvals = [dp[x_param] for dp in datapts]
             yvals = [dp[y_param] for dp in datapts]
             xvals, yvals = zip(*sorted(zip(xvals, yvals)))
-            ax.plot(xvals, yvals, '-o', label='{}'.format(fval))
+            ax.plot(xvals, yvals, 'o')
 
-        if iso_param is not None:
-            ivals = self.get_unique_param(param=iso_param)
-            for ival in ivals:
-                datapts = self.get_datapoints_by_paramval(param=iso_param, val=ival)
-                if len(datapts) > 1:
-                    xvals = [dp[x_param] for dp in datapts]
-                    yvals = [dp[y_param] for dp in datapts]
-                    ax.plot(xvals, yvals, '--', label='{}'.format(ival))
-
-        leg_title = '{} /\n{}'.format(family_param, iso_param) if iso_param is not None else '{}'.format(family_param)
-        ax.legend(title=leg_title, loc='best')
+        return fig
 
 
 class PropellerWVelData:

@@ -50,17 +50,22 @@ XFOIL- related support files, and the propeller directory
 will be used similarly to store any propeller / XROTOR - 
 related support files.*
 
-Pre-Requisite: XFOIL and XROTOR Executables
+Requisite: XFOIL and XROTOR Executables
 -------------------------------------------
 In order to utilize any PDT functionality that depends on 
 running XFOIL, the "xfoil.exe" executable file needs to be
-in the user-set "airfoil_database" location. 
+in the user-set "airfoil_database" location. *Current pip 
+installations include the xfoil.exe file in the foil_database,
+there should theoretically be no need to download it manually.*
 
 [XFOIL executable and docs](https://web.mit.edu/drela/Public/web/xfoil/)
 
 Likewise, in order to utilize any PDT functionality that
 depends on running XROTOR, the "xrotor.exe" executable file
 needs to be in the user-set "propeller_database" location.
+*Current pip installations include the xrotor.exe file in the 
+default prop_database, there should theoretically be no need to 
+download it manually.*
 
 [XROTOR executable and docs](http://www.esotec.org/sw/crotor.html#download)
 *(this is actually a link to "CROTOR", which I find is

@@ -4,6 +4,10 @@ from propeller_design_tools.user_io import Error, Input, Info
 import pkg_resources
 
 
+VALID_OPER_PLOT_PARAMS = ['adv. ratio', 'J', 'speed(m/s)', 'rpm', 'thrust(N)', 'power(W)', 'torque(N-m)', 'Efficiency',
+                          'Eff induced', 'Eff ideal', 'Pvisc(W)', 'Ct', 'Tc', 'Cp', 'Pc', 'Sigma']
+
+
 def set_airfoil_database(path: str):
     _save_settings({'airfoil_database': path})
     return
