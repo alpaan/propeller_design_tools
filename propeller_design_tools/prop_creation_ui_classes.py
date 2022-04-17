@@ -222,7 +222,7 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
             return
 
         if os.path.exists(prop.stl_fpath):
-            self.stl_fig = prop.plot_stl_mesh()
+            self.stl_view = prop.plot_stl_mesh()
 
     def save_stl_btn_clicked(self):
         prop = self.main_win.prop_widg.prop
@@ -473,6 +473,7 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
                 self.main_win.prop_widg.plot3d_widg.select_prop_cb.setCurrentText(prop.name)
         except Exception as e:
             self.main_win.print(e)
+
 
 class Propeller3dPlotWidget(QtWidgets.QWidget):
     def __init__(self, main_win: 'InterfaceMainWindow'):

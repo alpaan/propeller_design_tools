@@ -4,7 +4,9 @@ import numpy as np
 
 pdt.start_ui()
 
+
 # prop = pdt.Propeller('first_try_clarky')
+# prop.plot_gl3d_wvel_data()
 # prop.clear_sweep_data()
 # prop.analyze_sweep(velo_vals=np.arange(.1, .4, .05),
 #                    sweep_param='thrust',

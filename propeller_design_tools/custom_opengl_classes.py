@@ -69,3 +69,48 @@ class Custom3DAxis(gl.GLAxisItem):
         ogl.glVertex3f(0, 0, 0)
         ogl.glVertex3f(x, 0, 0)
         ogl.glEnd()
+
+
+class Custom3DArrow(GLGraphicsItem):
+    def __init__(self, view: gl.GLViewWidget, color: tuple = (0, 0, 1, 1), width: int = 2, length: float = None, tip_root: list = None):
+        super(Custom3DArrow, self).__init__()
+        self.view = view
+
+        if length is None and tip_root is None:
+            length = 1
+
+        if length is None:
+            assert len(tip_root) == 2
+            xtip, ytip, ztip = tip_root[0]
+            xroot, yroot, zroot = tip_root[1]
+            length = np.sqrt((xtip - xroot) ** 2 + (ytip - yroot) ** 2 + (ztip - zroot) ** 2)
+        else:
+            xtip, ytip, ztip = 0, 0, 0
+            xroot, yroot, zroot = 0, 0, -length
+            tip_root = [[xtip, ytip, ztip], [xroot, yroot, zroot]]
+        dx, dy, dz = [tip - root for tip, root in zip([xtip, ytip, ztip], [xroot, yroot, zroot])]
+        shaft_root = [xroot, yroot, zroot]
+        shaft_tip = [xroot + 0.75 * dx, yroot + 0.75 * dy, zroot + 0.75 * dz]
+
+        self.shaft = gl.GLLinePlotItem(pos=[shaft_root, shaft_tip], color=color, width=width, antialias=False, mode='line_strip', glOptions='opaque')
+        tip_length, tip_width = 0.25 * length, 0.12 * length
+        tip = gl.MeshData.cylinder(rows=2, cols=15, radius=[tip_width, 0.001 * tip_width], length=tip_length,
+                                   offset=False)
+        self.tip_mesh = gl.GLMeshItem(meshdata=tip, smooth=True, color=color, shader='shaded', glOptions='opaque')
+        self.view.addItem(self.shaft)
+        self.view.addItem(self.tip_mesh)
+
+        x_deg = np.rad2deg(np.arctan2(-dy, dz))
+        y_deg = np.rad2deg(np.arctan2(dx, -dz))
+        self.tip_mesh.translate(dx=0, dy=0, dz=-tip_length)
+        self.tip_mesh.rotate(x_deg, 1, 0, 0)
+        self.tip_mesh.rotate(y_deg, 0, 1, 0)
+        self.tip_mesh.translate(dx=xtip, dy=ytip, dz=ztip)
+
+    def translate(self, dx, dy, dz, local=False):
+        self.shaft.translate(dx, dy, dz, local=local)
+        self.tip_mesh.translate(dx, dy, dz, local=local)
+
+    def rotate(self, angle, x, y, z, local=False):
+        self.shaft.rotate(angle, x, y, z, local=local)
+        self.tip_mesh.rotate(angle, x, y, z, local=local)

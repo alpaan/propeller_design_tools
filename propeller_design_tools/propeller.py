@@ -5,6 +5,7 @@ from propeller_design_tools.user_io import Info, Error, Warning
 from propeller_design_tools.settings import get_setting
 from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.settings import VALID_OPER_PLOT_PARAMS
+from propeller_design_tools.custom_opengl_classes import Custom3DArrow
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from mpl_toolkits import mplot3d
@@ -363,6 +364,15 @@ class Propeller(object):
             te_pts.append([xs[1], ys[1], zs[1]])
         return le_pts, te_pts
 
+    def get_blade_quarter_chords(self):  # for plotting of wvel vectors
+        chordlines = self.get_blade_chordlines(rotate_deg=0)
+        q_chord_pts = []
+        for line in chordlines:
+            qtr_idx = int(len(line) / 4)
+            q_chord_pts.append(line[qtr_idx])
+
+        return q_chord_pts
+
     def get_blade_chordlines(self, rotate_deg: float, axis_shift: float = 0.25, npts: int = 50):
         radii = self.radius * np.array(self.xrotor_d['r/R'])
         chords = self.radius * np.array(self.xrotor_d['C/R'])
@@ -700,11 +710,14 @@ class Propeller(object):
         return fig
 
     def plot_gl3d_geometry(self, LE: bool = True, TE: bool = True, chords_betas: bool = True, hub: bool = True,
-                            input_stations: bool = True, interp_profiles: bool = True, savefig: bool = False, fig=None):
-        pg.mkQApp()
-        self.gl_geo_view = view = gl.GLViewWidget()
-        view.setFixedSize(1280, 720)
-        view.show()
+                            input_stations: bool = True, interp_profiles: bool = True, view=None):
+        if view is None:
+            pg.mkQApp()
+            self.gl_geo_view = view = gl.GLViewWidget()
+            view.setFixedSize(1280, 720)
+            view.show()
+        else:
+            pass
 
         blades = np.arange(self.xrotor_d['Nblds'])
         angles = 360 / self.xrotor_d['Nblds'] * blades
@@ -714,14 +727,14 @@ class Propeller(object):
             for ang in angles:
                 le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
                 le_line = gl.GLLinePlotItem(pos=le_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
-                                            mode='line_strip')
+                                            mode='line_strip', glOptions='opaque')
                 view.addItem(le_line)
 
         if TE:
             for ang in angles:
                 le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
                 te_line = gl.GLLinePlotItem(pos=te_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
-                                            mode='line_strip')
+                                            mode='line_strip', glOptions='opaque')
                 view.addItem(te_line)
 
         # plot stations
@@ -730,7 +743,7 @@ class Propeller(object):
                 chordlines = self.get_blade_chordlines(rotate_deg=ang)
                 for line in chordlines:
                     station_line = gl.GLLinePlotItem(pos=line, color=[i / 255 for i in [245, 66, 66, 255]],
-                                                     width=2, antialias=False, mode='line_strip')
+                                                     width=2, antialias=False, mode='line_strip', glOptions='opaque')
                     view.addItem(station_line)
 
         # plot station_params
@@ -752,7 +765,7 @@ class Propeller(object):
                                                               skew_deg=sk)
                 coords = list(zip(xc, yc, zc))
                 foils_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [5, 0, 163, 255]], width=2, antialias=False,
-                                               mode='line_strip')
+                                               mode='line_strip', glOptions='opaque')
                 view.addItem(foils_line)
 
         # plot interpolated profiles
@@ -761,7 +774,7 @@ class Propeller(object):
                 xc, yc, zc = prof_xyz
                 coords = list(zip(xc, yc, zc))
                 prof_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [163, 0, 0, 200]], width=2,
-                                              antialias=False, mode='line_strip')
+                                              antialias=False, mode='line_strip', glOptions='opaque')
                 view.addItem(prof_line)
 
         # plot hub
@@ -773,10 +786,10 @@ class Propeller(object):
             top_zs = np.ones(len(hub_x)) * hub_thickness / 2
             bot_zs = -np.ones(len(hub_x)) * hub_thickness / 2
             hub_line = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, top_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
-                                         antialias=False, mode='line_strip')
+                                         antialias=False, mode='line_strip', glOptions='opaque')
             view.addItem(hub_line)
             hub_line_bot = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, bot_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
-                                                          antialias=False, mode='line_strip')
+                                                          antialias=False, mode='line_strip', glOptions='opaque')
             view.addItem(hub_line_bot)
 
         # finish up formatting stuff
@@ -790,7 +803,7 @@ class Propeller(object):
 
         return view
 
-    def plot_gl3d_wvel_data(self, view=None):
+    def plot_gl3d_wvel_data(self, view=None, plot_every: int = 3):
         if view is None:
             pg.mkQApp()
             self.gl_wvel_view = view = gl.GLViewWidget()
@@ -802,57 +815,19 @@ class Propeller(object):
         blades = np.arange(self.xrotor_d['Nblds'])
         angles = 360 / self.xrotor_d['Nblds'] * blades
 
-        # plot le and te lines
-        for ang in angles:
-            le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
-            le_line = gl.GLLinePlotItem(pos=le_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
-                                        mode='line_strip')
-            view.addItem(le_line)
+        self.gl3d_wvel_view = view = self.plot_gl3d_geometry(view=view)
 
-        for ang in angles:
-            le_pts, te_pts = self.get_blade_le_te(rotate_deg=ang)
-            te_line = gl.GLLinePlotItem(pos=te_pts, color=[0.5, 0.5, 0.5, 1.0], width=2, antialias=False,
-                                        mode='line_strip')
-            view.addItem(te_line)
-
-        # plot stations
-        for ang in angles:
-            chordlines = self.get_blade_chordlines(rotate_deg=ang)
-            for line in chordlines:
-                station_line = gl.GLLinePlotItem(pos=line, color=[i / 255 for i in [245, 66, 66, 255]],
-                                                 width=2, antialias=False, mode='line_strip')
-                view.addItem(station_line)
-
-        # plot interpolated profiles
-        for prof_num, prof_xyz in self.blade_xyz_profiles.items():
-            xc, yc, zc = prof_xyz
-            coords = list(zip(xc, yc, zc))
-            prof_line = gl.GLLinePlotItem(pos=coords, color=[i / 255 for i in [163, 0, 0, 200]], width=2,
-                                          antialias=False, mode='line_strip')
-            view.addItem(prof_line)
-
-        # plot hub
-        hub_thickness = abs(max([pt[2] for pt in le_pts]) - min([pt[2] for pt in te_pts]))
-        theta = np.linspace(0, np.pi * 2, 50)
-        hub_x = np.cos(theta) * self.hub_radius
-        hub_y = np.sin(theta) * self.hub_radius
-        top_zs = np.ones(len(hub_x)) * hub_thickness / 2
-        bot_zs = -np.ones(len(hub_x)) * hub_thickness / 2
-        hub_line = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, top_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
-                                     antialias=False, mode='line_strip')
-        view.addItem(hub_line)
-        hub_line_bot = gl.GLLinePlotItem(pos=list(zip(hub_x, hub_y, bot_zs)), color=[0.5, 0.5, 0.5, 1.0], width=2,
-                                         antialias=False, mode='line_strip')
-        view.addItem(hub_line_bot)
-
-        # finish up formatting stuff
-        lim = self.radius * 2.5
-        view.setCameraPosition(distance=lim, azimuth=-90)
-        zgrid = gl.GLGridItem()
-        zgrid.setSize(2, 2, 2)
-        zgrid.setSpacing(.2, .2, .2)
-        zgrid.translate(0, 0, -0.5)
-        view.addItem(zgrid)
+        # plot vel vectors
+        q_chord_pts = self.get_blade_quarter_chords()
+        assert len(self.blade_data['r/R']) == len(q_chord_pts)
+        for i, pt in enumerate(q_chord_pts):
+            if i % plot_every == 0:
+                va = self.blade_data['VA'][i]
+                vt = self.blade_data['VT'][i]
+                vd = self.blade_data['VD'][i]
+                vector_root = pt
+                vector_tip = pt[0] - vd, pt[1] + vt, pt[2] - va
+                vector = Custom3DArrow(view=view, tip_root=[vector_tip, vector_root], width=3)
 
         return view
 
@@ -864,16 +839,37 @@ class Propeller(object):
         mdata = np.zeros(n_tri, dtype=mesh.Mesh.dtype)
 
         tri_idx = 0
+
+        # iterate over the profiles
         for k in range(n_prof - 1):
             xyz_prof = self.blade_xyz_profiles[k]
             nxt_prof = self.blade_xyz_profiles[k + 1]
-            for i in range(n_pts - 1):  # right hand rule to get normal direction correct
+
+            # root profile
+            if k == 0:
+                vectors = funcs.compute_profile_trimesh(profile_coords=xyz_prof)
+                for vec in vectors:
+                    mdata['vectors'][tri_idx] = np.array(vec)
+                    tri_idx += 1
+
+            # tip profile
+            if k == n_prof - 2:
+                vectors = funcs.compute_profile_trimesh(profile_coords=nxt_prof)
+                for vec in vectors:
+                    mdata['vectors'][tri_idx] = np.array(vec)
+                    tri_idx += 1
+
+            # inter-profile surfaces
+            for i in range(n_pts):  # right hand rule to get normal direction correct
+                if i == n_pts - 1:     # TE gap
+                    i = -1
                 a = xyz_prof[:, i]  # a is a point-coordinate in (x, y, z) format
                 b = nxt_prof[:, i]  # same for b-f
                 c = nxt_prof[:, i + 1]
                 d = a.copy()
                 e = c.copy()
                 f = xyz_prof[:, i + 1]
+
                 mdata['vectors'][tri_idx] = np.array([a, b, c])      # populate the array of triangle vectors
                 mdata['vectors'][tri_idx + 1] = np.array([d, e, f])  # going in order, 2 triangles per iteration
                 tri_idx += 2
@@ -900,15 +896,26 @@ class Propeller(object):
             if verbose:
                 Warning('STL file does not exist, use "generate_stl_geometry()" first')
 
-    def plot_stl_mesh(self):
-        self.stl_fig = fig = plt.figure(figsize=(10, 8))
-        ax3d = fig.add_subplot(projection='3d')
-        stl_fname = os.path.split(self.stl_fpath)[-1]
-        ax3d.set_title(stl_fname)
-        ax3d.add_collection3d(mplot3d.art3d.Poly3DCollection(self.stl_mesh.vectors))
-        scale = self.stl_mesh.points.flatten()
-        ax3d.auto_scale_xyz(scale, scale, scale)
-        return fig
+    def plot_stl_mesh(self, view: gl.GLViewWidget = None):
+        if view is None:
+            pg.mkQApp()
+            self.view = view = gl.GLViewWidget()
+            self.view.setFixedSize(1280, 720)
+            view.show()
+
+        grid = gl.GLGridItem()
+        grid.scale(self.radius / 10, self.radius / 10, self.radius / 10)
+        grid.translate(dx=0, dy=0, dz=-self.radius / 4)
+        view.addItem(grid)
+        view.setCameraPosition(distance=self.radius * 1.5, elevation=10, azimuth=-70)
+
+        md = gl.MeshData(vertexes=self.stl_mesh.vectors)
+        mesh_itm = gl.GLMeshItem(meshdata=md, color=[0, 0, .7, 1], edgeColor=[.5, .5, .5, 1], drawEdges=False, drawFaces=True,
+                                 shader='normalColor', smooth=False)
+        mesh_itm.translate(dx=-0.5 * self.radius, dy=0, dz=0)
+        view.addItem(mesh_itm)
+
+        return view
 
     def plot_ideal_eff(self):
         Info('"{}" ideal efficiency: {:.1f}%'.format(self.name, self.ideal_eff))
@@ -960,8 +967,23 @@ class Propeller(object):
 class PropellerOperData:
     def __init__(self, directory: str):
         self.directory = directory
-        self.datapoints = None
+        self.datapoints = {}
         self.prop_name = os.path.split(os.path.split(self.directory)[0])[1]
+
+    def __len__(self):
+        return len(self.datapoints)
+
+    def get_swept_params(self):
+        valid_params = VALID_OPER_PLOT_PARAMS
+        swept_params = []
+        for param in valid_params:
+            for dp in self.datapoints.values():
+                if param not in swept_params:
+                    pts = self.get_datapoints_by_paramval(param=param, val=dp[param])
+                    if len(pts) > 2 and len(pts) < len(self.datapoints):
+                        swept_params.append(param)
+
+        return swept_params
 
     def get_oper_files(self, fullpath: bool = True):
         if os.path.exists(self.directory):
@@ -1029,15 +1051,13 @@ class PropellerOperData:
         x_param, y_param, family_param, iso_param = params
 
         if x_param not in valid_params:
-            raise Error('x_param "{}" is not one of the valid params ("adv. ratio", "J", "speed(m/s)", "rpm")'.format(x_param))
+            raise Error('x_param "{}" is not one of the valid params ({})'.format(x_param, valid_params))
         if y_param not in valid_params:
-            raise Error('y_param "{}" is not one of the valid params ("thrust(N)", "power(W)", "torque(N-m)", '
-                        '"Efficiency", "Eff induced", "Eff ideal", "Pvisc(W)", "Ct" ,"Tc", "Cp", "Pc", "Sigma")'
-                        .format(y_param))
+            raise Error('y_param "{}" is not one of the valid params ({})'.format(y_param, valid_params))
         if family_param not in valid_params and family_param is not None:
-            raise Error('family_param error')
+            raise Error('family_param error, must be one of {}'.format(valid_params))
         if iso_param not in valid_params and iso_param is not None:
-            raise Error('iso_param error')
+            raise Error('iso_param error, must be one of {}'.format(valid_params))
 
         if fig is None:
             fig = plt.figure(figsize=[10, 8])
@@ -1066,6 +1086,7 @@ class PropellerOperData:
                     if len(datapts) > 1:
                         xvals = [dp[x_param] for dp in datapts]
                         yvals = [dp[y_param] for dp in datapts]
+                        xvals, yvals = zip(*sorted(zip(xvals, yvals)))
                         ax.plot(xvals, yvals, '--', label='{}'.format(ival))
 
             leg_title = '{} /\n{}'.format(family_param, iso_param) if iso_param is not None else '{}'.format(family_param)
@@ -1083,7 +1104,11 @@ class PropellerOperData:
 class PropellerWVelData:
     def __init__(self, directory: str):
         self.directory = directory
-        self.datapoints = None
+        self.datapoints = {}
+        self.prop_name = os.path.split(os.path.split(self.directory)[0])[1]
+
+    def __len__(self):
+        return len(self.datapoints)
 
     def get_wvel_files(self, fullpath: bool = True):
         if os.path.exists(self.directory):

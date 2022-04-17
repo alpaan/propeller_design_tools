@@ -294,3 +294,149 @@ class AxesComboBoxWidget(QtWidgets.QWidget):
     def set_init_ytxt(self):
         if self.init_ytxt is not None:
             self.yax_cb.setCurrentText(self.init_ytxt)
+
+
+class CheckColumnWidget(QtWidgets.QWidget):
+
+    checkboxClicked = QtCore.pyqtSignal(dict)
+
+    def __init__(self, title: str = None, title_font_size: int = 14, title_bold: bool = True, col_groups: list = None,
+                 grp_num_cols: list = []):
+        super(CheckColumnWidget, self).__init__()
+        self._layout = QtWidgets.QVBoxLayout()
+        self.setLayout(self._layout)
+
+        self._title_lbl = PDT_Label(font_size=title_font_size, bold=title_bold)
+        self._layout.addWidget(self._title_lbl)
+        self._col_grp_layout = QtWidgets.QHBoxLayout()
+        self._layout.addLayout(self._col_grp_layout)
+        self._group_vlayouts = {}
+
+        self._title = title
+        self.title = title
+        self._col_groups = col_groups
+        self.col_groups = col_groups
+        self._grp_num_cols = grp_num_cols
+        self.grp_num_cols = grp_num_cols
+
+    @property
+    def group_vlayouts(self):
+        return self._group_vlayouts
+
+    @property
+    def title(self):
+        return self._title
+
+    @title.setter
+    def title(self, t: str):
+        self._title_lbl.setText(t)
+        self._title = t
+
+    @property
+    def col_groups(self):
+        return self._col_groups
+
+    @col_groups.setter
+    def col_groups(self, groups: list):
+
+        for i in reversed(range(self._col_grp_layout.count())):
+            widg = self._col_grp_layout.itemAt(i).widget()
+            widg.setParent(None)
+
+        self._col_groups = groups
+        if groups is None:
+            self._grp_num_cols = []
+            return
+
+        for grp_name in groups:
+            grp = PDT_GroupBox(grp_name)
+            grp_lay = QtWidgets.QHBoxLayout()
+            grp.setLayout(grp_lay)
+
+            self._col_grp_layout.addWidget(grp)
+            self._group_vlayouts[grp_name] = []
+
+        if self._grp_num_cols == []:
+            self.grp_num_cols = [1] * len(self.col_groups)
+
+    @property
+    def grp_num_cols(self):
+        return self._grp_num_cols
+
+    @grp_num_cols.setter
+    def grp_num_cols(self, num_cols: list):
+        if num_cols is None or self.col_groups is None:
+            return
+
+        self._grp_num_cols = num_cols
+        for grp_name, num_col in zip(self.col_groups, num_cols):
+            for i in range(num_col):
+                vlay = QtWidgets.QVBoxLayout()
+                grp_lay = self.get_group_layout_by_name(grp_name)
+                grp_lay.addLayout(vlay)
+                self._group_vlayouts[grp_name].append(vlay)
+
+    def get_group_layout_by_name(self, name: str):
+        for i in range(self._col_grp_layout.count()):
+            widg = self._col_grp_layout.itemAt(i).widget()
+            if name == widg.title():
+                return widg.layout()
+
+    def get_num_cols_by_name(self, name: str):
+        for i in range(self._col_grp_layout.count()):
+            widg = self._col_grp_layout.itemAt(i).widget()
+            if name == widg.title():
+                return self.grp_num_cols[i]
+
+    def add_checkbox(self, lbl: str, colname: str, chkd: bool = False, **chk_kwargs):
+        vlays = self._group_vlayouts[colname]
+        counts= []
+        for i, vlay in enumerate(vlays):
+            counts.append(vlay.count())
+        idx = counts.index(min(counts))
+        lay = vlays[idx]
+
+        chk = PDT_CheckBox(lbl, checked=chkd, **chk_kwargs)
+        chk.clicked.connect(self.checkbox_clicked)
+        lay.addWidget(chk)
+
+    def clear_group_by_name(self, grp_name: str):
+        lays = self._group_vlayouts[grp_name]
+        for lay in lays:
+            for i in reversed(range(lay.count())):
+                itm = lay.itemAt(i)
+                if itm is not None:
+                    widg = itm.widget()
+                    widg.setParent(None)
+
+    def clear(self):
+        if self._col_groups is None:
+            return
+
+        for name in self._col_groups:
+            self.clear_group_by_name(name)
+        self.col_groups = None
+
+    def get_checkboxes(self, colname: str = None):
+        chk_boxes = []
+        colnames_to_get = [colname] if colname is not None else self.col_groups
+        for name in colnames_to_get:
+            vlays = self.group_vlayouts[name]
+            for vlay in vlays:
+                itms = [vlay.itemAt(i) for i in range(vlay.count())]
+                chks = [itm.widget() for itm in itms if itm is not None]
+                chk_boxes.extend(chks)
+        return chk_boxes
+
+    def get_checked_strs(self, colname: str = None):
+        txts = {}
+        colnames_to_get = [colname] if colname is not None else self.col_groups
+        for name in colnames_to_get:
+            chks = self.get_checkboxes(name)
+            txts[name] = [chk.text() for chk in chks if chk.isChecked()]
+
+        return txts
+
+    def checkbox_clicked(self):
+        self.checkboxClicked.emit(self.get_checked_strs())
+

@@ -1089,6 +1089,78 @@ def generate_3D_profile_points(nondim_xy_coords: np.ndarray, radius: float, axis
     return np.vstack([xs, ys, zs])
 
 
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+            angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+            angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+            angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+
+def compute_polygon_angles(exterior_coords: list):
+    angles = []
+    for i in range(len(exterior_coords)):
+        pt = exterior_coords[i]
+        last_pt = exterior_coords[i - 1]
+        if i == len(exterior_coords) - 1:
+            next_pt = exterior_coords[0]
+        else:
+            next_pt = exterior_coords[i + 1]
+
+        v1 = [next_pt[0] - pt[0], next_pt[1] - pt[1], next_pt[2] - pt[2]]
+        v2 = [last_pt[0] - pt[0], last_pt[1] - pt[1], last_pt[2] - pt[2]]
+        ang = angle_between(v1, v2)
+        angles.append(ang)
+    return angles
+
+
+def compute_profile_trimesh(profile_coords):
+    if len(profile_coords) == 3:
+        xc, yc, zc = profile_coords
+    elif len(profile_coords) == 2:
+        xc, yc = profile_coords
+        zc = np.zeros(len(xc))
+    else:
+        raise ValueError('len of profile_coords must be either 2 or 3')
+    points = list(zip(xc, yc, zc))
+
+    # 1) For each vertex in the polygon, compute the angle between the two linked edges
+    # 2) Sort vertices by decreasing angle relative to the interior of the polygon
+    # 3) If there is less than 3 vertices in the set, we're done
+    # 4) Take the last vertex in the set and output the triangle formed by it and its two neighbours
+    # 5) Remove the vertex from the set
+    # 6) Update the angle of the two neighbours
+    # 7) Jump to 2
+
+    vectors = []
+    while len(points) >= 3:
+        angles = compute_polygon_angles(exterior_coords=points)
+        min_idx = np.argmin(angles)
+        prev_idx = min_idx - 1
+        if min_idx == len(angles) - 1:
+            next_idx = 0
+        else:
+            next_idx = min_idx + 1
+        pt1, pt2, pt3 = points[prev_idx], points[min_idx], points[next_idx]
+        vector = [pt1, pt2, pt3]
+        vectors.append(vector)
+        _ = points.pop(min_idx)
+
+    return vectors
+
+
 # ===== USER INTERFACE STUFF =====
 def start_ui():
     from PyQt5 import QtWidgets

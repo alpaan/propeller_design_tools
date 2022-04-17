@@ -77,6 +77,7 @@ Example Scripts / Workflow
 At a high-level, the current concept for PDT workflow is as 
 follows (after obtaining the required executables and pip-installing 
 the PDT package):
+
 0. Try out the (currently extremely buggy and incomplete) user interface!
 [example0_user_interface.py](
    https://github.com/helloDestroyerOfWorlds/propeller_design_tools/blob/master/tests/example1_airfoil_analysis.py
@@ -84,8 +85,9 @@ the PDT package):
 
    ![ex0-1.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex0-1.png)
    ![ex0-2.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex0-2.png)
+   ![ex0-3.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex0-3.png)
 
-2. Obtain normalized airfoil coordinate files from
+1. Obtain normalized airfoil coordinate files from
 [UIUC Database](https://m-selig.ae.illinois.edu/ads/coord_database.html)
 -> save these files into the "airfoil_database" directory
 
@@ -136,8 +138,12 @@ including profle xyz coordinate listings, and .stl 3D geometry files -> see
    ![ex4-1.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex4-1.png)
 
 
-5. **WIP** Prop analysis (integrating XROTOR's sweeps commands and displaying 
-outputs)
+5. Analyze a given Propeller() instance across a sweep of operating points -> see 
+[example5_prop_analysis.py](
+   https://github.com/helloDestroyerOfWorlds/propeller_design_tools/blob/master/tests/example5_prop_analysis.py
+   )
+
+   ![ex5-1.png](https://raw.githubusercontent.com/helloDestroyerOfWorlds/propeller_design_tools/master/tests/ex5-1.png)
 
 
 6. **WIP** Prop optimization (grid-search style generic optimizer for "optimal"

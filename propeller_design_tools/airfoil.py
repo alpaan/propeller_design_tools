@@ -82,6 +82,8 @@ class Airfoil(object):
         ax.set_ylim((left - right / 2), -(left - right / 2))
         ax.set_title(self.filename)
 
+        return fig
+
     def alpha_auto_range(self, re: int, ncrit: int, mach: float, verbose: bool = True, xfoil_verbose: bool = False,
                          hide_windows: bool = True):
         if verbose:
@@ -570,3 +572,15 @@ class Airfoil(object):
             return np.vstack([self.x_coords, self.y_coords])
         else:
             raise Error('Code to interpolate more profile points is incomplete...')
+
+    def plot_2D_trimesh(self):
+        fig = self.plot_geometry()
+        ax = fig.axes[0]
+
+        vectors = funcs.compute_profile_trimesh(profile_coords=self.get_coords())
+        for vector in vectors:
+            pt1, pt2, pt3 = vector
+            ax.plot([pt1[0], pt2[0]], [pt1[1], pt2[1]], color='r', ls='--', marker='o')
+            ax.plot([pt2[0], pt3[0]], [pt2[1], pt3[1]], color='r', ls='--', marker='o')
+            ax.plot([pt3[0], pt1[0]], [pt3[1], pt1[1]], color='r', ls='--', marker='o')
+
