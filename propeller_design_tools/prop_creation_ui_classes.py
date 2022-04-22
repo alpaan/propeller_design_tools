@@ -9,9 +9,10 @@ from propeller_design_tools.settings import get_prop_db
 try:
     from PyQt5 import QtWidgets, QtCore
     from propeller_design_tools.helper_ui_classes import SingleAxCanvas, Capturing, AxesComboBoxWidget, \
-        PropellerCreationPanelCanvas
+        PropellerCreationPanelCanvas, RadialStationFitParamsCanvas
     from propeller_design_tools.helper_ui_subclasses import PDT_ComboBox, PDT_Label, PDT_SpinBox, PDT_DoubleSpinBox, \
         PDT_PushButton, PDT_LineEdit, PDT_CheckBox
+    import pyqtgraph.opengl as gl
 except:
     pass
 
@@ -76,6 +77,7 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         super(PropellerCreationControlWidget, self).__init__()
         self.main_win = main_win
         self.widgets_to_toggle = []
+        self.stl_view = None
 
         main_lay = QtWidgets.QHBoxLayout()
         self.setLayout(main_lay)
@@ -490,7 +492,10 @@ class Propeller3dPlotWidget(QtWidgets.QWidget):
         self.enable_edit_chk = PDT_CheckBox('Enable Editing of Design Point', italic=True, font_size=10)
         # self.enable_edit_chk.clicked.connect(self.enable_edit_chk_clicked)
         form_lay.addRow(self.enable_edit_chk)
-        self.show_panel_btn = PDT_PushButton('Show Design\nPoint Panel', font_size=14, width=180, bold=True)
+        self.show_rstation_btn = PDT_PushButton('Show Radial\nStation Params', font_size=14, width=160, bold=True)
+        self.show_rstation_btn.clicked.connect(self.show_rstation_btn_clicked)
+        hlay.addWidget(self.show_rstation_btn)
+        self.show_panel_btn = PDT_PushButton('Show Design\nPoint Panel', font_size=14, width=160, bold=True)
         self.show_panel_btn.clicked.connect(self.show_panel_btn_clicked)
         hlay.addWidget(self.show_panel_btn)
         main_lay.addLayout(hlay)
@@ -502,6 +507,24 @@ class Propeller3dPlotWidget(QtWidgets.QWidget):
 
     # def enable_edit_chk_clicked(self):
     #     pass
+
+    def show_rstation_btn_clicked(self):
+        prop = self.main_win.prop_widg.prop
+        if prop is not None:
+            self.station_widgs = []
+            for st in prop.stations:
+                st_widg = QtWidgets.QWidget()
+                self.station_widgs.append(st_widg)
+                lay = QtWidgets.QVBoxLayout()
+                st_widg.setLayout(lay)
+
+                fit_canvas = RadialStationFitParamsCanvas()
+                lay.addWidget(fit_canvas)
+                st.plot_xrotor_fit_params(fig=fit_canvas.figure)
+
+                st_widg.show()
+                fit_canvas.draw()
+        return
 
     def show_panel_btn_clicked(self):
         prop = self.main_win.prop_widg.prop

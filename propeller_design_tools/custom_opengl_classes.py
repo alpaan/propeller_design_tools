@@ -93,7 +93,7 @@ class Custom3DArrow(GLGraphicsItem):
         shaft_tip = [xroot + 0.75 * dx, yroot + 0.75 * dy, zroot + 0.75 * dz]
 
         self.shaft = gl.GLLinePlotItem(pos=[shaft_root, shaft_tip], color=color, width=width, antialias=False, mode='line_strip', glOptions='opaque')
-        tip_length, tip_width = 0.25 * length, 0.12 * length
+        tip_length, tip_width = 0.25 * length, 0.08 * length
         tip = gl.MeshData.cylinder(rows=2, cols=15, radius=[tip_width, 0.001 * tip_width], length=tip_length,
                                    offset=False)
         self.tip_mesh = gl.GLMeshItem(meshdata=tip, smooth=True, color=color, shader='shaded', glOptions='opaque')

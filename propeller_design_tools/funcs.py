@@ -2,13 +2,14 @@ import os
 import subprocess
 import shutil
 import sys
+import urllib.request
 
 import matplotlib.pyplot as plt
 import numpy as np
 from propeller_design_tools.airfoil import Airfoil
 from propeller_design_tools.radialstation import RadialStation
 from propeller_design_tools.propeller import Propeller
-from propeller_design_tools.user_io import Info, Error
+from propeller_design_tools.user_io import Info, Error, Warning
 from propeller_design_tools.settings import _get_user_settings, get_prop_db, get_foil_db
 
 
@@ -583,7 +584,51 @@ def read_profile_xyz(fpath: str):
 
 
 # =============== INTERFACING WITH 3RD PARTY PROGRAMS ===============
-def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: bool = False):
+def download_foil_coordinates(foil_str: str):
+    foil_str = '{}.dat'.format(foil_str) if not foil_str.endswith('.dat') else foil_str
+    coord_url = 'https://m-selig.ae.illinois.edu/ads/coord/{}'.format(foil_str)
+    savepath = os.path.join(get_foil_db(), foil_str)
+    Info('Attempting to download "{}"...'.format(coord_url))
+    try:
+        urllib.request.urlretrieve(coord_url, savepath)
+        Info('saved to "{}"'.format(savepath), indent_level=1)
+        return True
+    except urllib.error.HTTPError:
+        Warning('Unable to download, not found')
+        return False
+
+
+def read_radial_stations(prop: Propeller, plot_also: bool = True, verbose: bool = False):
+    stations = []
+    if not os.path.exists(prop.station_polar_folder):
+        return stations
+
+    fnames = os.listdir(prop.station_polar_folder)
+    for fname in fnames:
+        roR, foil_name = fname.replace('.polar', '').split('_')
+        roR = float(roR)
+        fpath = os.path.join(prop.station_polar_folder, fname)
+        with open(fpath, 'r') as f:
+            txt = f.read().strip()
+        lines = txt.split('\n')
+
+        pol = {}
+        for line in lines:
+            key, val_str = line.split(':', 1)
+            if ',' in val_str:
+                val = np.array([float(v.strip()) for v in val_str.split(',')])
+            else:
+                val = float(val_str.strip())
+            pol[key] = val
+        st = RadialStation(foil_polar=pol, momma=prop, re_estimate=pol['re'], mach_estimate=pol['mach'],
+                           ncrit_estimate=pol['ncrit'], Xisection=roR, plot=plot_also, verbose=verbose,
+                           foil_name_str=foil_name)
+        stations.append(st)
+
+    return stations
+
+
+def create_radial_stations(prop: Propeller, plot_also: bool = True, verbose: bool = True):
     # get density for Re estimates
     if prop.design_atmo_props['altitude_km'] == -1:
         rho, nu = 1000, 0.1150e-5
@@ -922,6 +967,7 @@ def create_propeller(name: str, nblades: int, radius: float, hub_radius: float, 
 
     # save the PDT propeller meta-file, and then read in the operating point dictionary by calling load_from_savefile()
     prop.xrotor_op_dict = read_xrotor_op_file(prop.xrop_file)
+    prop.save_station_polars()
     prop.save_meta_file()
     prop.load_from_savefile(verbose=verbose)   # reads meta, xrr, xrop, and point clouds
 

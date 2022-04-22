@@ -6,7 +6,8 @@ from propeller_design_tools.funcs import get_all_propeller_dirs
 from propeller_design_tools.propeller import Propeller
 try:
     from PyQt5 import QtWidgets, QtCore
-    from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_GroupBox, PDT_ComboBox, PDT_PushButton
+    from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_GroupBox, PDT_ComboBox, PDT_PushButton, \
+        PDT_CheckBox
     from propeller_design_tools.helper_ui_classes import SingleAxCanvas, PropellerCreationPanelCanvas, \
         CheckColumnWidget, AxesComboBoxWidget
 except:
@@ -73,6 +74,22 @@ class PropellerSweepSelectPropWidget(QtWidgets.QWidget):
         layout.addLayout(top_lay)
 
         layout.addStretch()
+        grp = PDT_GroupBox('Velocity Vectors', width=200)
+        grp_lay = QtWidgets.QVBoxLayout()
+        grp.setLayout(grp_lay)
+        self.tot_vel_chk = tot_vel_chk = PDT_CheckBox('Total')
+        tot_vel_chk.clicked.connect(self.tot_ax_tan_chk_clicked)
+        grp_lay.addWidget(tot_vel_chk)
+        self.ax_vel_chk = ax_vel_chk = PDT_CheckBox('Axial (thrust)')
+        ax_vel_chk.clicked.connect(self.tot_ax_tan_chk_clicked)
+        grp_lay.addWidget(ax_vel_chk)
+        self.tan_vel_chk = tan_vel_chk = PDT_CheckBox('Tangential (swirl)')
+        tan_vel_chk.clicked.connect(self.tot_ax_tan_chk_clicked)
+        grp_lay.addWidget(tan_vel_chk)
+        layout.addWidget(grp)
+        layout.setAlignment(grp, QtCore.Qt.AlignHCenter)
+
+        layout.addStretch()
         bot_lay = QtWidgets.QHBoxLayout()
         bot_lay.addStretch()
         self.wvel_3d_view = wvel_3d_view = gl.GLViewWidget()
@@ -82,17 +99,30 @@ class PropellerSweepSelectPropWidget(QtWidgets.QWidget):
         layout.addLayout(bot_lay)
         layout.addStretch()
 
+    def tot_ax_tan_chk_clicked(self):
+        center = self.wvel_3d_view.opts['center']
+        distance = self.wvel_3d_view.opts['distance']
+        elevation = self.wvel_3d_view.opts['elevation']
+        azimuth = self.wvel_3d_view.opts['azimuth']
+
+        self.plot_prop_wvel()
+        self.wvel_3d_view.setCameraPosition(pos=center, distance=distance, elevation=elevation, azimuth=azimuth)
+
     def pop_select_prop_cb(self):
+        self.select_prop_cb.clear()
         item_txts = ['None'] + get_all_propeller_dirs()
         self.select_prop_cb.addItems(item_txts)
 
     def select_prop_cb_changed(self):
         self.main_win.prop_sweep_widg.exist_data_widg.clear()
+        if self.select_prop_cb.currentText().strip() == '':
+            return
+
         if self.select_prop_cb.currentText() == 'None':
             self.prop = None
             self.wvel_3d_view.clear()
-            self.metric_plot_widget.axes.clear()
-            self.metric_plot_widget.plot_canvas.draw()
+            self.main_win.prop_sweep_widg.metric_plot_widget.axes.clear()
+            self.main_win.prop_sweep_widg.metric_plot_widget.plot_canvas.draw()
         else:
             self.prop = Propeller(self.select_prop_cb.currentText())
             self.plot_prop_wvel()
@@ -113,7 +143,10 @@ class PropellerSweepSelectPropWidget(QtWidgets.QWidget):
 
     def plot_prop_wvel(self):
         self.wvel_3d_view.clear()
-        self.prop.plot_gl3d_wvel_data(view=self.wvel_3d_view)
+        total = self.tot_vel_chk.isChecked()
+        axial = self.ax_vel_chk.isChecked()
+        tang = self.tan_vel_chk.isChecked()
+        self.prop.plot_gl3d_wvel_data(total=total, axial=axial, tangential=tang, view=self.wvel_3d_view)
 
 
 class PropellerSweepMetricPlotWidget(QtWidgets.QWidget):

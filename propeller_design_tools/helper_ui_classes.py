@@ -1,4 +1,6 @@
 import os
+import subprocess
+
 import numpy as np
 import matplotlib.gridspec as gridspec
 from propeller_design_tools.settings import get_setting, set_propeller_database, set_airfoil_database, \
@@ -11,7 +13,7 @@ from io import StringIO
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 try:
-    from PyQt5 import QtWidgets, QtCore
+    from PyQt5 import QtWidgets, QtCore, QtGui
     from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_PushButton, PDT_SpinBox, PDT_DoubleSpinBox, \
         PDT_ComboBox, PDT_GroupBox, PDT_CheckBox, PDT_TextEdit, PDT_LineEdit, PDT_ScienceSpinBox
 except:
@@ -36,6 +38,12 @@ class SingleAxCanvas(FigureCanvasQTAgg):
     def clear_axes(self):
         self.axes.clear()
         self.draw()
+
+
+class RadialStationFitParamsCanvas(FigureCanvasQTAgg):
+    def __init__(self, *args, **kwargs):
+        fig = Figure(figsize=(15, 8))
+        super(RadialStationFitParamsCanvas, self).__init__(fig)
 
 
 class PropellerCreationPanelCanvas(FigureCanvasQTAgg):
@@ -127,6 +135,13 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
         self.found_lbl = PDT_Label('', font_size=11)
         lay.addWidget(self.found_lbl)
 
+    def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
+        menu = QtWidgets.QMenu(self)
+        open_db_act = menu.addAction('Open Database in Explorer')
+        action = menu.exec_(self.mapToGlobal(event.pos()))
+        if action == open_db_act:
+            self.open_db_action()
+
     @property
     def found_files(self):
         if self.db_type == 'airfoil':
@@ -137,6 +152,11 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
     @property
     def found_txt(self):
         return '{} {}(s) found!'.format(self.found_files, self.db_type)
+
+    def open_db_action(self):
+        db = self.get_existing_setting()
+        if os.path.exists(db):
+            subprocess.Popen('explorer "{}"'.format(os.path.normpath(db)))
 
     def get_existing_setting(self):
         if self.db_type == 'airfoil':
@@ -173,7 +193,7 @@ class DatabaseSelectionWidget(QtWidgets.QWidget):
 
     def set_btn_clicked(self):
         cap = 'Set {} database directory'.format(self.db_type)
-        start_dir = os.getcwd()
+        start_dir = self.get_existing_setting()
         direc = QtWidgets.QFileDialog.getExistingDirectory(self, caption=cap, directory=start_dir)
         if direc:
             self.set_current_db(db_dir=direc)

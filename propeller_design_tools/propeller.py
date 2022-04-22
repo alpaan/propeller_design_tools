@@ -21,7 +21,7 @@ class Propeller(object):
     creation_attrs = {'nblades': int, 'radius': float, 'hub_radius': float, 'hub_wake_disp_br': float,
                       'design_speed_mps': float, 'design_adv': float, 'design_rpm': float, 'design_thrust': float,
                       'design_power': float, 'design_cl': dict, 'design_atmo_props': dict, 'design_vorform': str,
-                      'station_params': dict, 'geo_params': dict}
+                      'station_params': dict, 'station_polars': list, 'geo_params': dict}
     saveload_attrs = {**creation_attrs, **{'name': str, 'meta_file': str, 'xrr_file': str, 'xrop_file': str,
                                            'blade_data': dict, 'blade_xyz_profiles': dict}}
 
@@ -73,6 +73,10 @@ class Propeller(object):
     @property
     def stl_fpath(self):
         return os.path.join(self.save_folder, '{}.stl'.format(self.name))
+
+    @property
+    def station_polar_folder(self):
+        return os.path.join(self.save_folder, 'station_polars')
 
     @property
     def bld_prof_folder(self):
@@ -285,7 +289,9 @@ class Propeller(object):
             Info(s='Successfully read meta-file (.meta)!', indent_level=1)
 
         # set the stations... why did I do it this way??
-        self.set_stations(plot_also=False, verbose=True, from_loadsave_file=True)
+        self.set_stations(plot_also=False, verbose=verbose, from_loadsave_file=True)
+        if verbose:
+            Info(s='Successfully read and set station polars!', indent_level=1)
 
         # then read in the XROTOR restart file (in the xrotor_geometry_files)
         self.xrotor_d = self.read_xrotor_restart()
@@ -313,8 +319,13 @@ class Propeller(object):
         if not from_loadsave_file:
             self.stations, txt = funcs.create_radial_stations(prop=self, plot_also=plot_also, verbose=verbose)
         else:
-            self.stations, txt = None, ''
+            self.stations = funcs.read_radial_stations(prop=self, plot_also=plot_also, verbose=False)
+            txt = ''
         return txt
+
+    def show_station_fits(self):
+        for st in self.stations:
+            fig = st.plot_xrotor_fit_params()
 
     def set_blade_data(self, blade_dict: dict):
         self.blade_data = blade_dict
@@ -335,7 +346,7 @@ class Propeller(object):
         return
 
     def save_meta_file(self):
-        attrs_2_ignore = ['blade_xyz_profiles', 'meta_file', 'xrr_file', 'xrop_file']   # ignore the files so that prop_dirs can be switched
+        attrs_2_ignore = ['blade_xyz_profiles', 'meta_file', 'xrr_file', 'xrop_file', 'station_polars']   # ignore the files so that prop_dirs can be switched
 
         if os.path.exists(self.meta_file):
             os.remove(self.meta_file)
@@ -348,6 +359,21 @@ class Propeller(object):
                         f.write('{}: {}\n'.format('blade_data_{}'.format(key), val))
                 else:
                     f.write('{}: {}\n'.format(attr, getattr(self, attr)))
+
+    def save_station_polars(self):
+        if not os.path.exists(self.station_polar_folder):
+            os.mkdir(self.station_polar_folder)
+
+        for i, roR in enumerate(self.station_params.keys()):
+            station = self.stations[i]
+            foil_name = self.station_params[roR]
+            savename = '{}_{}.polar'.format(roR, foil_name)
+            savepath = os.path.join(self.station_polar_folder, savename)
+            with open(savepath, 'w') as f:
+                for key, val in station.foil_polar.items():
+                    if isinstance(val, list) or isinstance(val, np.ndarray):
+                        val = ', '.join([str(v) for v in val])
+                    f.write('{}: {}\n'.format(key, val))
 
     def get_blade_le_te(self, rotate_deg: float = 0.0, axis_shift: float = 0.25):
         radii = self.radius * np.array(self.xrotor_d['r/R'])
@@ -803,7 +829,8 @@ class Propeller(object):
 
         return view
 
-    def plot_gl3d_wvel_data(self, view=None, plot_every: int = 3):
+    def plot_gl3d_wvel_data(self, total: bool = True, axial: bool = False, tangential: bool = False, view=None,
+                            plot_every: int = 3):
         if view is None:
             pg.mkQApp()
             self.gl_wvel_view = view = gl.GLViewWidget()
@@ -825,9 +852,18 @@ class Propeller(object):
                 va = self.blade_data['VA'][i]
                 vt = self.blade_data['VT'][i]
                 vd = self.blade_data['VD'][i]
-                vector_root = pt
-                vector_tip = pt[0] - vd, pt[1] + vt, pt[2] - va
-                vector = Custom3DArrow(view=view, tip_root=[vector_tip, vector_root], width=3)
+                if total:
+                    vector_root = pt
+                    vector_tip = pt[0] - vd, pt[1] + vt, pt[2] - va
+                    vector = Custom3DArrow(view=view, tip_root=[vector_tip, vector_root], width=3)
+                if axial:
+                    vector_root = pt
+                    vector_tip = pt[0], pt[1], pt[2] - va
+                    vector = Custom3DArrow(view=view, tip_root=[vector_tip, vector_root], width=3, color=(.05, .65, .13, 1))
+                if tangential:
+                    vector_root = pt
+                    vector_tip = pt[0], pt[1] + vt, pt[2]
+                    vector = Custom3DArrow(view=view, tip_root=[vector_tip, vector_root], width=3, color=(.92, .84, .2, 1))
 
         return view
 
@@ -896,12 +932,14 @@ class Propeller(object):
             if verbose:
                 Warning('STL file does not exist, use "generate_stl_geometry()" first')
 
-    def plot_stl_mesh(self, view: gl.GLViewWidget = None):
-        if view is None:
+    def plot_stl_mesh(self):
+        if not hasattr(self, 'stl_view'):
             pg.mkQApp()
-            self.view = view = gl.GLViewWidget()
-            self.view.setFixedSize(1280, 720)
-            view.show()
+            self.stl_view = gl.GLViewWidget()
+        view = self.stl_view
+        view.clear()
+        view.setFixedSize(1280, 720)
+        view.show()
 
         grid = gl.GLGridItem()
         grid.scale(self.radius / 10, self.radius / 10, self.radius / 10)
@@ -909,7 +947,7 @@ class Propeller(object):
         view.addItem(grid)
         view.setCameraPosition(distance=self.radius * 1.5, elevation=10, azimuth=-70)
 
-        md = gl.MeshData(vertexes=self.stl_mesh.vectors)
+        md = gl.MeshData(vertexes=self.stl_mesh.vectors.copy())
         mesh_itm = gl.GLMeshItem(meshdata=md, color=[0, 0, .7, 1], edgeColor=[.5, .5, .5, 1], drawEdges=False, drawFaces=True,
                                  shader='normalColor', smooth=False)
         mesh_itm.translate(dx=-0.5 * self.radius, dy=0, dz=0)

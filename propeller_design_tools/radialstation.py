@@ -12,14 +12,20 @@ class RadialStation(object):
     req_xrotor_attrs = ['A0deg', 'dCLdA', 'dCLdAstall', 'CLmax', 'CLmin', 'CLinc2stall', 'CDmin', 'CLCDmin',
                         'dCDdCL2', 'REref', 'REexp', 'Cmconst', 'Mcrit']
 
-    def __init__(self, station_idx: int = None, foil: Airfoil = None, re_estimate: int = None, momma=None,
-                 Xisection: float = None, plot: bool = False, verbose: bool = True, **xrotor_kwargs):
+    def __init__(self, station_idx: int = None, foil: Airfoil = None, re_estimate: int = None,
+                 mach_estimate: float = 0.0, ncrit_estimate: int = 9, momma=None, Xisection: float = None,
+                 plot: bool = False, verbose: bool = True, foil_polar: dict = None, foil_name_str: str = '',
+                 **xrotor_kwargs):
 
         self.station_idx = station_idx
         self.momma = momma
         self.Xisection = Xisection
         self.re_estimate = re_estimate
+        self.mach_estimate = mach_estimate
+        self.ncrit_estimate = ncrit_estimate
         self.foil = foil
+        self.foil_polar = foil_polar
+        self.foil_name_str = foil_name_str
 
         # initialize required attrs as None
         self.A0deg, self.dCLdA, self.dCLdAstall, self.CLmax, self.CLmin, self.CLinc2stall, self.CDmin, self.CLCDmin, \
@@ -27,21 +33,38 @@ class RadialStation(object):
 
         # need to give re_estimate
         if re_estimate is None:
-            raise Error('Must give an Re estimate at which to interpolate data')
+            raise Error('Must give an Re estimate at which to interpolate data / at which data was obtained')
 
-        # kick em out if no airfoil given and all the required inputs were not given
-        if foil is None:
-            raise Error('Must give an Airfoil() as an input into RadialStation()')
+        # kick em out if no airfoil or no polar given
+        if foil is None and foil_polar is None:
+            raise Error('Must give an Airfoil() or foil polar data as an input into RadialStation()')
             # for attr in self.req_xrotor_attrs:
             #     if attr not in xrotor_kwargs:
             #         raise Error('Required argument "{}" not given'.format(attr))
             #     else:   # set the required inputs if one was given though
             #         setattr(self, attr, xrotor_kwargs[attr])
-        else:   # otherwise initialize all the req_attrs automatically from airfoil's data
+        # kick em out if both given
+        elif foil is not None and foil_polar is not None:
+            raise Error('Cannot give both foil and foil_polar as inputs into RadialStation()')
+        elif isinstance(foil, Airfoil):  # initialize all the req_attrs automatically from airfoil's data
             if verbose:
                 Info('Initializing RadialStation() from foil "{}" interpolated @ Re={}'
                      .format(self.foil.name, self.re_estimate))
             self.init_from_airfoil(foil=foil, re_estimate=re_estimate, plot_also=plot, verbose=verbose)
+        elif isinstance(foil_polar, dict):  # initialize all req_attrs automatically from polar data
+            if verbose:
+                Info('Initializing RadialStation() from given polar data @ Re={}'.format(self.re_estimate))
+            self.init_from_polar(polar=foil_polar, plot_also=plot, verbose=verbose)
+        else:
+            inp = 'foil' if foil is not None else 'foil_polar'
+            raise Error('Input type not recognized for {}'.format(inp))
+
+    @property
+    def foil_name(self):
+        if isinstance(self.foil, Airfoil):
+            return self.foil.name
+        else:
+            return self.foil_name_str
 
     def set_mom_prop(self, momma):
         self.momma = momma
@@ -53,11 +76,16 @@ class RadialStation(object):
                           plot_also: bool = False, verbose: bool = True):
         # interpolate the given estimates
         self.foil = foil
-        pol = foil.interpolate_polar(npts=50, re=re_estimate, mach=mach_estimate, ncrit=ncrit_estimate)
+        self.foil_polar = pol = foil.interpolate_polar(npts=50, re=re_estimate, mach=mach_estimate, ncrit=ncrit_estimate)
         # solve for fit params, plot if also
-        idx_lims = self.calc_xrotor_fit_params(pol=pol, verbose=verbose)
+        self.idx_lims = self.calc_xrotor_fit_params(pol=pol, verbose=verbose)
         if plot_also:
-            self.plot_xrotor_fit_params(pol=pol, idx_lims=idx_lims)
+            self.plot_xrotor_fit_params()
+
+    def init_from_polar(self, polar: dict, plot_also: bool = False, verbose: bool = False):
+        self.idx_lims = self.calc_xrotor_fit_params(pol=polar, verbose=verbose)
+        if plot_also:
+            self.plot_xrotor_fit_params()
 
     def xrotor_CL_model(self, a: float):
         # get distance from input alpha, calc CL based on linear slope assumption
@@ -171,7 +199,10 @@ class RadialStation(object):
 
         return min_idx, pre_stall_idx
 
-    def plot_xrotor_fit_params(self, pol: dict, idx_lims: tuple = None):
+    def plot_xrotor_fit_params(self, fig=None):
+        pol = self.foil_polar
+        idx_lims = self.idx_lims
+
         # plotting parameters for all the axes
         xlbls = ['CD', 'alpha', 'alpha']
         ylbls = ['CL', 'CL', 'CM']
@@ -179,7 +210,9 @@ class RadialStation(object):
         kw = {'marker': '*', 'lw': 4, 'alpha': 0.4, 'markersize': 12, 'linestyle': '--'}
 
         # create figure and axes, turn grids on
-        fig = plt.figure(figsize=(15, 8))
+        if fig is None:
+            fig = plt.figure(figsize=(15, 8))
+
         gs = fig.add_gridspec(1, 4)
         fig.add_subplot(gs[:, :2])
         fig.add_subplot(gs[:, 2])
@@ -188,7 +221,7 @@ class RadialStation(object):
 
         sect_txt = 'None' if self.station_idx is None else '{}'.format(self.station_idx + 1)
         fig.suptitle('Blade Section {} @ Xi={}\n{} Interpolated @ Re={}, Mach={}, nCrit={}\nXROTOR Section Parametric Modeling'.
-                     format(sect_txt, self.Xisection, self.foil.name, pol['re'], pol['mach'], pol['ncrit']))
+                     format(sect_txt, self.Xisection, self.foil_name, pol['re'], pol['mach'], pol['ncrit']))
 
         # iterate over axes and set them up, also plot the data to be fitted on each
         for ax, xlbl, ylbl, xlim in zip(axes, xlbls, ylbls, xlims):
@@ -289,6 +322,8 @@ class RadialStation(object):
         fig.subplots_adjust(left=0.06, right=0.97, top=0.88, bottom=0.08, wspace=0.35)
         axes[0].set_ylim(axes[1].get_ylim())
         axes[2].legend(loc='upper left', bbox_to_anchor=(-0.6, 1.14))
+
+        return fig
 
     def save_xrotor_input_txt(self, prop_name, section_num, Xi):
         savepath = os.path.join(os.getcwd(),

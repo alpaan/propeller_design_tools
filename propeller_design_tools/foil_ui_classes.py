@@ -1,11 +1,12 @@
-from propeller_design_tools.funcs import delete_all_widgets_from_layout, get_all_airfoil_files, clear_foil_database
+from propeller_design_tools.funcs import delete_all_widgets_from_layout, get_all_airfoil_files, clear_foil_database, \
+    download_foil_coordinates
 from propeller_design_tools.airfoil import Airfoil
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 import numpy as np
 try:
     from PyQt5 import QtWidgets, QtCore
     from propeller_design_tools.helper_ui_subclasses import PDT_Label, PDT_GroupBox, PDT_PushButton, PDT_ComboBox, \
-        PDT_CheckBox
+        PDT_CheckBox, PDT_LineEdit
     from propeller_design_tools.helper_ui_classes import RangeLineEditWidget, SingleAxCanvas, AxesComboBoxWidget, \
         Capturing
 except:
@@ -50,6 +51,18 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
         af_center_lay.addWidget(self.foil_xy_navbar)
         af_center_lay.setAlignment(self.foil_xy_navbar, QtCore.Qt.AlignHCenter)
 
+        af_center_bot_lay = QtWidgets.QFormLayout()
+        lbl = PDT_Label('Download a Foil\nfrom UIUC Database:', font_size=14, bold=True)
+        download_btn = PDT_PushButton('Download', font_size=12)
+        download_btn.clicked.connect(self.download_btn_clicked)
+        af_center_bot_lay.addRow(lbl, download_btn)
+        af_center_bot_lay.setAlignment(download_btn, QtCore.Qt.AlignBottom)
+        self.download_name_le = download_name_le = PDT_LineEdit(font_size=11, width=150)
+        af_center_bot_lay.addRow(PDT_Label('Foil Name:', font_size=12), download_name_le)
+        af_center_lay.addStretch()
+        af_center_lay.addLayout(af_center_bot_lay)
+        af_center_lay.addStretch()
+
         # airfoil right
         af_right_top_lay = QtWidgets.QHBoxLayout()
         af_right_lay.addLayout(af_right_top_lay)
@@ -76,6 +89,21 @@ class FoilAnalysisWidget(QtWidgets.QWidget):
     @property
     def foil(self):
         return self.main_win.foil
+
+    def download_btn_clicked(self):
+        foil_txt = self.download_name_le.text()
+        if foil_txt.strip() == '':
+            return
+        foil_txt = '{}.dat'.format(foil_txt) if not foil_txt.endswith('.dat') else foil_txt
+
+        with Capturing() as output:
+            successful = download_foil_coordinates(foil_str=foil_txt)
+        self.main_win.print(output)
+
+        if successful:
+            self.main_win.af_db_select_widg.update_found_lbl()
+            self.main_win.repop_select_foil_cb()
+            self.select_foil_cb.setCurrentText(foil_txt)
 
     def af_metric_cb_changed(self):
         self.foil_metric_canvas.axes.clear()

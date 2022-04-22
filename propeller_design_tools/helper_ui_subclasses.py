@@ -11,12 +11,14 @@ class PDT_GroupBox(QtWidgets.QGroupBox):
         italic = kwargs.pop('italic') if 'italic' in kwargs else False
         bold = kwargs.pop('bold') if 'bold' in kwargs else False
         font_size = kwargs.pop('font_size') if 'font_size' in kwargs else 10
+        width = kwargs.pop('width') if 'width' in kwargs else None
 
         super(PDT_GroupBox, self).__init__(*args, **kwargs)
 
         self.set_italic(italic=italic)
         self.set_bold(bold=bold)
         self.set_font_size(font_size=font_size)
+        self.set_width(width=width)
 
     def set_italic(self, italic: bool):
         font = self.font()
@@ -32,6 +34,11 @@ class PDT_GroupBox(QtWidgets.QGroupBox):
         font = self.font()
         font.setPointSize(font_size)
         self.setFont(font)
+
+    def set_width(self, width: int):
+        if width is None:
+            return
+        self.setFixedWidth(width)
 
 
 class PDT_Label(QtWidgets.QLabel):

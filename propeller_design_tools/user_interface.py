@@ -95,16 +95,6 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         self.af_db_select_widg.currentDatabaseChanged.connect(self.repop_select_foil_cb)
         self.prop_db_select_widg.currentDatabaseChanged.connect(self.repop_select_prop_cb)
 
-    def contextMenuEvent(self, event: QtGui.QContextMenuEvent) -> None:
-        menu = QtWidgets.QMenu(self)
-        open_foil_db_act = menu.addAction('Open Foil Database in Explorer')
-        open_prop_db_act = menu.addAction('Open Propeller Database in Explorer')
-        action = menu.exec_(self.mapToGlobal(event.pos()))
-        if action == open_foil_db_act:
-            self.open_foil_db_action()
-        elif action == open_prop_db_act:
-            self.open_prop_db_action()
-
     def mousePressEvent(self, a0: QtGui.QMouseEvent) -> None:
         fpaths = _get_gunshot_fpaths()
         num = int(np.random.rand() * 3.4)
@@ -116,20 +106,10 @@ class InterfaceMainWindow(QtWidgets.QMainWindow):
         player.setVolume(20)
         player.play()
 
-    def open_foil_db_action(self):
-        foil_db = self.af_db_select_widg.get_existing_setting()
-        if os.path.exists(foil_db):
-            subprocess.Popen('explorer "{}"'.format(os.path.normpath(foil_db)))
-
-    def open_prop_db_action(self):
-        prop_db = self.prop_db_select_widg.get_existing_setting()
-        if os.path.exists(prop_db):
-            subprocess.Popen('explorer "{}"'.format(os.path.normpath(prop_db)))
-
     def repop_select_prop_cb(self):
         self.print('Repopulating propeller dropdowns...')
         self.prop_widg.plot3d_widg.populate_select_prop_cb()
-        self.prop_sweep_widg.select_prop_cb.pop_select_prop_cb()
+        self.prop_sweep_widg.select_prop_widg.pop_select_prop_cb()
 
     def repop_select_foil_cb(self):
         self.print('Repopulating foil dropdown...')
