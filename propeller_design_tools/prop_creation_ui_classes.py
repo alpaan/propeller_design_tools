@@ -167,12 +167,12 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         # extra geo params
         form_lay2c.addRow(PDT_Label('Extra Geometry Output Parameters', font_size=14, bold=True))
         self.skew_sb = PDT_DoubleSpinBox(font_size=12, width=80)
-        self.skew_sb.setMaximum(40)
+        self.skew_sb.setMaximum(45)
         form_lay2c.addRow(PDT_Label('Skew:', font_size=12), self.skew_sb)
         self.n_prof_pts_sb = PDT_SpinBox(font_size=12, width=80)
         self.n_prof_pts_sb.setSpecialValueText('None')
         form_lay2c.addRow(PDT_Label('# Profile Pts:', font_size=12), self.n_prof_pts_sb)
-        self.n_profs_sb = PDT_SpinBox(font_size=12, width=80)
+        self.n_profs_sb = PDT_SpinBox(font_size=12, width=80, box_range=[0, 500])
         form_lay2c.addRow(PDT_Label('# Radial Profiles:', font_size=12), self.n_profs_sb)
 
         # create and reset buttons
@@ -260,7 +260,6 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
                 widg.setEnabled(enable)
             else:
                 widg.setEnabled(not enable)
-
 
     def des_thrust_sb_changed(self):
         if self.design_thrust_sb.value() == self.design_thrust_sb.minimum():
@@ -445,36 +444,56 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         else:
             atmo_props = {'rho': rho, 'nu': nu, 'vsou': vsou}
 
-        try:
-            with Capturing() as output:
-                prop = create_propeller(name=name,
-                                        nblades=nblades,
-                                        radius=radius,
-                                        hub_radius=hub_radius,
-                                        hub_wake_disp_br=hub_wk_disp_br,
-                                        design_speed_mps=speed,
-                                        design_cl=cl_dict,
-                                        design_atmo_props=atmo_props,
-                                        design_vorform=vorform,
-                                        station_params=stations_dict,
-                                        design_adv=adv,
-                                        design_rpm=rpm,
-                                        design_thrust=thrust,
-                                        design_power=power,
-                                        n_radial=nradial,
-                                        verbose=True,
-                                        show_station_fit_plots=False,
-                                        plot_after=False,
-                                        tmout=None,
-                                        hide_windows=True,
-                                        geo_params={'tot_skew': skew, 'n_prof_pts': n_prof_pts, 'n_profs': n_profs})
-            self.main_win.console_te.append('\n'.join(output) if len(output) > 0 else '')
-            if prop:
-                self.main_win.prop_db_select_widg.update_found_lbl()
-                self.main_win.prop_widg.plot3d_widg.populate_select_prop_cb()
-                self.main_win.prop_widg.plot3d_widg.select_prop_cb.setCurrentText(prop.name)
-        except Exception as e:
-            self.main_win.print(e)
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_create_worker_progress)
+        self.timer.start(1000)
+        self.timer_cntr = 0
+
+        self.thread = QtCore.QThread()
+        self.prop_create_worker = CreatePropellerWorker(name=name,
+                                                        nblades=nblades,
+                                                        radius=radius,
+                                                        hub_radius=hub_radius,
+                                                        hub_wake_disp_br=hub_wk_disp_br,
+                                                        design_speed_mps=speed,
+                                                        design_cl=cl_dict,
+                                                        design_atmo_props=atmo_props,
+                                                        design_vorform=vorform,
+                                                        station_params=stations_dict,
+                                                        design_adv=adv,
+                                                        design_rpm=rpm,
+                                                        design_thrust=thrust,
+                                                        design_power=power,
+                                                        n_radial=nradial,
+                                                        skew=skew,
+                                                        n_prof_pts=n_prof_pts,
+                                                        n_profs=n_profs)
+        self.prop_create_worker.moveToThread(self.thread)
+        self.thread.started.connect(self.prop_create_worker.run)
+        self.prop_create_worker.finished.connect(self.thread.quit)
+        self.prop_create_worker.finished.connect(self.prop_create_worker.deleteLater)
+        self.prop_create_worker.finished.connect(self.on_create_worker_finish)
+        self.thread.finished.connect(self.thread.deleteLater)
+        self.prop_create_worker.progress.connect(self.update_create_worker_progress)
+
+        self.main_win.prop_widg.setEnabled(False)
+        self.thread.start()
+
+    def on_create_worker_finish(self, prop, output):
+        self.timer.stop()
+        self.main_win.prog_bar.setValue(0)
+        self.main_win.print(output)
+        if prop:
+            self.main_win.prop_db_select_widg.update_found_lbl()
+            self.main_win.prop_widg.plot3d_widg.populate_select_prop_cb()
+            self.main_win.prop_widg.plot3d_widg.select_prop_cb.setCurrentText(prop.name)
+            self.main_win.prop_widg.setEnabled(True)
+
+    def update_create_worker_progress(self):
+        val = 2 if self.vorform_cb.currentText() == 'vrtx' else 33
+        self.timer_cntr += val
+        prog_val = self.timer_cntr if self.timer_cntr < 100 else 99
+        self.main_win.prog_bar.setValue(prog_val)
 
 
 class Propeller3dPlotWidget(QtWidgets.QWidget):
@@ -706,3 +725,66 @@ class AtmoPropsInputWidget(QtWidgets.QWidget):
             self.rho_sb.setEnabled(False)
             self.nu_sb.setEnabled(False)
             self.vsou_sb.setEnabled(False)
+
+
+class CreatePropellerWorker(QtCore.QObject):
+    finished = QtCore.pyqtSignal(object, list)
+    progress = QtCore.pyqtSignal(int)
+
+    def __init__(self, name: str, nblades: int, radius: float, hub_radius: float, hub_wake_disp_br: float,
+                 design_speed_mps: float, design_cl: dict, design_atmo_props: dict, design_vorform: str,
+                 station_params: dict = None, design_adv: float = None, design_rpm: float = None,
+                 design_thrust: float = None, design_power: float = None, n_radial: int = 50, skew: float = 0.0,
+                 n_prof_pts: int = None, n_profs: int = 50):
+
+        super(CreatePropellerWorker, self).__init__()
+
+        self.name = name
+        self.nblades = nblades
+        self.radius = radius
+        self.hub_radius = hub_radius
+        self.hub_wake_disp_br = hub_wake_disp_br
+        self.design_speed_mps = design_speed_mps
+        self.design_cl = design_cl
+        self.design_atmo_props = design_atmo_props
+        self.design_vorform = design_vorform
+        self.station_params = station_params
+        self.design_adv = design_adv
+        self.design_rpm = design_rpm
+        self.design_thrust = design_thrust
+        self.design_power = design_power
+        self.n_radial = n_radial
+        self.skew = skew
+        self.n_prof_pts = n_prof_pts
+        self.n_profs = n_profs
+
+    def run(self):
+        try:
+            with Capturing() as output:
+                prop = create_propeller(name=self.name,
+                                        nblades=self.nblades,
+                                        radius=self.radius,
+                                        hub_radius=self.hub_radius,
+                                        hub_wake_disp_br=self.hub_wake_disp_br,
+                                        design_speed_mps=self.design_speed_mps,
+                                        design_cl=self.design_cl,
+                                        design_atmo_props=self.design_atmo_props,
+                                        design_vorform=self.design_vorform,
+                                        station_params=self.station_params,
+                                        design_adv=self.design_adv,
+                                        design_rpm=self.design_rpm,
+                                        design_thrust=self.design_thrust,
+                                        design_power=self.design_power,
+                                        n_radial=self.n_radial,
+                                        verbose=True,
+                                        show_station_fit_plots=False,
+                                        plot_after=False,
+                                        tmout=None,
+                                        hide_windows=True,
+                                        geo_params={'tot_skew': self.skew, 'n_prof_pts': self.n_prof_pts,
+                                                    'n_profs': self.n_profs})
+        except Exception as e:
+            prop = None
+            output = [e.__repr__()]
+
+        self.finished.emit(prop, output)
