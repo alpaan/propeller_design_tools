@@ -966,7 +966,7 @@ class Propeller(object):
                               torque=torque, power=power, velo=velo, xrotor_verbose=xrotor_verbose)
 
     def analyze_sweep(self, velo_vals: list, sweep_param: str, sweep_vals: list, verbose: bool = True,
-                      xrotor_verbose: bool = False, vorform: str = None):
+                      xrotor_verbose: bool = False, vorform: str = None, prog_signal=None):
         if sweep_param not in ['adva', 'rpm', 'thrust', 'power', 'torque']:
             raise Error('"sweep_param" must be one of ("adva", "rpm", "thrust", "power", "torque")')
 
@@ -974,24 +974,39 @@ class Propeller(object):
 
         total_pnts = len(velo_vals) * len(sweep_vals)
         if verbose:
-            Info('Analyzing "{}" across a sweep of {} operating points'.format(self.name, total_pnts))
+            info_str = 'Analyzing "{}" across a sweep of {} operating points'.format(self.name, total_pnts)
+            if prog_signal is not None:
+                prog_signal.emit(0, [info_str])
+            else:
+                Info(info_str)
         count = 0
         for velo_val in velo_vals:
             for v, val in enumerate(sweep_vals):
                 count += 1
                 if verbose:
-                    Info('Analyzing sweep point # {} / {}'.format(count, total_pnts))
+                    info_str = 'Analyzing sweep point # {} / {}'.format(count, total_pnts)
+                    if prog_signal is not None:
+                        prog_signal.emit(count / total_pnts * 100, [info_str])
+                    else:
+                        Info(info_str)
                 try:
-                    funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=vorform, velo=velo_val,
+                    funcs.run_xrotor_oper(xrr_file=self.xrr_file, vorform=vorform, velo=velo_val, verbose=False,
                                           xrotor_verbose=xrotor_verbose, **{sweep_param: val})
                 except Error as e:
-                    Warning('Failed to get XROTOR oper results for vel={}, {}={}\n{}'.format(velo_val, sweep_param, val, e))
-                    pass
+                    warn_str = 'Failed to get XROTOR oper results for vel={}, {}={}\n{}'.format(velo_val, sweep_param, val, e)
+                    if prog_signal is not None:
+                        prog_signal.emit(None, [warn_str])
+                    else:
+                        Warning(warn_str)
+                        pass
 
         self.oper_data.load_oper_sweep_results()
         self.wvel_data.load_wvel_sweep_results()
         if verbose:
-            Info('Done!')
+            if prog_signal is not None:
+                prog_signal.emit(0, 'Done!')
+            else:
+                Info('Done!')
 
     def clear_sweep_data(self):
         if os.path.exists(self.oper_data_dir):
@@ -1014,12 +1029,15 @@ class PropellerOperData:
     def get_swept_params(self):
         valid_params = VALID_OPER_PLOT_PARAMS
         swept_params = []
+        avoid_params = []
         for param in valid_params:
             for dp in self.datapoints.values():
                 if param not in swept_params:
                     pts = self.get_datapoints_by_paramval(param=param, val=dp[param])
-                    if len(pts) > 2 and len(pts) < len(self.datapoints):
+                    if 2 < len(pts) < len(self.datapoints) and param not in avoid_params:
                         swept_params.append(param)
+                    else:
+                        avoid_params.append(param)
 
         return swept_params
 

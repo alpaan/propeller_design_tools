@@ -237,7 +237,7 @@ class RangeLineEditWidget(QtWidgets.QWidget):
         lay.addWidget(PDT_Label('by'))
 
         if spin_double_science == 'double':
-            self.step_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=[0, 10],
+            self.step_box = PDT_DoubleSpinBox(font_size=12, width=80, box_range=[0, np.inf],
                                               box_single_step=0.01, default_str=self.step_default)
         elif spin_double_science == 'spin':
             self.step_box = PDT_SpinBox(font_size=12, width=80, box_range=[1, 1e8],

@@ -5,7 +5,6 @@ import numpy as np
 pdt.start_ui()
 
 # prop = pdt.Propeller('MyPropeller')
-# prop.
 
 # prop = pdt.Propeller('first_try_clarky')
 # prop.show_station_fits()
