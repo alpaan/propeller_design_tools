@@ -224,7 +224,6 @@ class Propeller(object):
                             val = []
                     setattr(self, attr, val)
         self.set_blade_data(blade_dict=blade_data)
-        self.set_bld_profiles(point_dict=point_cloud)
 
     def read_xrotor_restart(self):
         with open(self.xrr_file, 'r') as f:
@@ -331,20 +330,6 @@ class Propeller(object):
         self.blade_data = blade_dict
         return
 
-    def set_bld_profiles(self, point_dict: dict):
-        pc = {}
-        for key, val in point_dict.items():
-            fkey, axkey = key.strip(')').split('(', 1)
-            r = float(fkey)
-            if r not in pc:
-                pc[r] = {}
-            pc[r][axkey] = val
-
-        for key, val in pc.items():
-            pc[key] = np.vstack([val[ak] for ak in ['x', 'y']])
-        self.blade_xyz_profiles = pc
-        return
-
     def save_meta_file(self):
         attrs_2_ignore = ['blade_xyz_profiles', 'meta_file', 'xrr_file', 'xrop_file', 'station_polars']   # ignore the files so that prop_dirs can be switched
 
@@ -430,7 +415,8 @@ class Propeller(object):
         funcs.delete_files_from_folder(self.bld_prof_folder)
 
         station = self.stations[0]
-        nondim_coords = station.foil.get_coords(n_interp=n_prof_pts)
+        # nondim_coords = station.foil.get_coords(n_interp=n_prof_pts)
+        nondim_coords = station.foil.get_coords_closed_te(n_interp=n_prof_pts)
 
         self.blade_xyz_profiles = {}
         for i, roR in enumerate(np.linspace(self.blade_data['r/R'][0], self.blade_data['r/R'][-1], n_profs)):
@@ -870,35 +856,36 @@ class Propeller(object):
     def generate_stl_geometry(self, plot_after: bool = True, verbose: bool = True):
         n_prof = len(self.blade_xyz_profiles)
         n_pts = np.max(np.shape(self.blade_xyz_profiles[0]))
-        n_tri = n_pts * 2 * n_prof
+        n_main_surf = (n_prof - 1) * 2 * (n_pts - 1)
+        n_root = n_pts - 3
+        n_tip = n_pts - 3
+        n_tri = n_main_surf + n_root + n_tip
 
         mdata = np.zeros(n_tri, dtype=mesh.Mesh.dtype)
 
         tri_idx = 0
+
+        # root profile
+        vectors = funcs.compute_profile_trimesh(profile_coords=self.blade_xyz_profiles[0])  # outwards
+        # vectors = funcs.compute_profile_trimesh(profile_coords=self.blade_xyz_profiles[0], reverse_order=True)  # inwards
+        for vec in vectors:
+            mdata['vectors'][tri_idx] = np.array(vec)
+            tri_idx += 1
+
+        # tip profile
+        vectors = funcs.compute_profile_trimesh(profile_coords=self.blade_xyz_profiles[n_prof - 1], reverse_order=True)    # outwards
+        # vectors = funcs.compute_profile_trimesh(profile_coords=self.blade_xyz_profiles[n_prof - 1])    # inwards
+        for vec in vectors:
+            mdata['vectors'][tri_idx] = np.array(vec)
+            tri_idx += 1
 
         # iterate over the profiles
         for k in range(n_prof - 1):
             xyz_prof = self.blade_xyz_profiles[k]
             nxt_prof = self.blade_xyz_profiles[k + 1]
 
-            # root profile
-            if k == 0:
-                vectors = funcs.compute_profile_trimesh(profile_coords=xyz_prof)
-                for vec in vectors:
-                    mdata['vectors'][tri_idx] = np.array(vec)
-                    tri_idx += 1
-
-            # tip profile
-            if k == n_prof - 2:
-                vectors = funcs.compute_profile_trimesh(profile_coords=nxt_prof)
-                for vec in vectors:
-                    mdata['vectors'][tri_idx] = np.array(vec)
-                    tri_idx += 1
-
             # inter-profile surfaces
-            for i in range(n_pts):  # right hand rule to get normal direction correct
-                if i == n_pts - 1:     # TE gap
-                    i = -1
+            for i in range(n_pts - 1):  # right hand rule to get normal direction correct
                 a = xyz_prof[:, i]  # a is a point-coordinate in (x, y, z) format
                 b = nxt_prof[:, i]  # same for b-f
                 c = nxt_prof[:, i + 1]
@@ -906,8 +893,14 @@ class Propeller(object):
                 e = c.copy()
                 f = xyz_prof[:, i + 1]
 
+                # outwards
                 mdata['vectors'][tri_idx] = np.array([a, b, c])      # populate the array of triangle vectors
                 mdata['vectors'][tri_idx + 1] = np.array([d, e, f])  # going in order, 2 triangles per iteration
+
+                # inwards
+                # mdata['vectors'][tri_idx] = np.array([c, b, a])      # populate the array of triangle vectors
+                # mdata['vectors'][tri_idx + 1] = np.array([f, e, d])  # going in order, 2 triangles per iteration
+
                 tri_idx += 2
 
         m = mesh.Mesh(mdata)

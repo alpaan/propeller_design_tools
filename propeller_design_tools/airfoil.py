@@ -34,9 +34,13 @@ class Airfoil(object):
         self.coord_fpath = os.path.join(get_foil_db(), fname)
 
         name, x_coords, y_coords = funcs.read_airfoil_coordinate_file(fpath=self.coord_fpath, verbose=verbose)
+        _, xc_closed_te, yc_closed_te = funcs.read_airfoil_coordinate_file(fpath=self.coord_fpath, verbose=False,
+                                                                           te_gap_set=0.0)
         self.filename = os.path.basename(self.coord_fpath)
         self.x_coords = np.array(x_coords)
         self.y_coords = np.array(y_coords)
+        self.xc_closed_te = xc_closed_te
+        self.yc_closed_te = yc_closed_te
 
         self.xfoil_coord_fpath = self.write_xfoil_coord_file()
         self.polar_data = {}      # dictionary of dictionaries, keys are floats of Re
@@ -69,13 +73,18 @@ class Airfoil(object):
                 f.write('{x:.7f} {y:.7f}\n'.format(x=coord[0], y=coord[1]))
         return savepath
 
-    def plot_geometry(self, fig=None):
+    def plot_geometry(self, fig=None, closed_te: bool = False):
         if fig is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
         else:
             ax = fig.axes[0]
-        ax.plot(self.x_coords, self.y_coords)
+
+        if closed_te:
+            ax.plot(self.xc_closed_te, self.yc_closed_te)
+        else:
+            ax.plot(self.x_coords, self.y_coords)
+
         ax.set_aspect('equal')
         ax.grid(True)
         left, right = ax.get_xlim()
@@ -570,6 +579,12 @@ class Airfoil(object):
     def get_coords(self, n_interp: int = None):
         if n_interp is None:
             return np.vstack([self.x_coords, self.y_coords])
+        else:
+            raise Error('Code to interpolate more profile points is incomplete...')
+
+    def get_coords_closed_te(self, n_interp: int = None):
+        if n_interp is None:
+            return np.vstack([self.xc_closed_te, self.yc_closed_te])
         else:
             raise Error('Code to interpolate more profile points is incomplete...')
 

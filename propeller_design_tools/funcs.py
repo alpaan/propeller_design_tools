@@ -228,7 +228,7 @@ def scrub_nans(d: dict):
 
 
 # =============== FILE READING / WRITING FUNCTIONS ===============
-def read_airfoil_coordinate_file(fpath: str, verbose: bool = True):
+def read_airfoil_coordinate_file(fpath: str, verbose: bool = True, te_gap_set: float = 0.004):
     """
     Function to read an airfoil coordinate listing file in .dat or .txt format, assumes foil name is on
     1st line, then reads in the list of coordinates following (ignoring any lines with numbers > 1.0, and
@@ -290,10 +290,9 @@ def read_airfoil_coordinate_file(fpath: str, verbose: bool = True):
 
     # check TE gap
     te_gap = upper_coords[0][1] - lower_coords[-1][1]
-    te_gap_lim = 0.004
     blend_start = 0.7
-    if te_gap < te_gap_lim:
-        total_dy = (te_gap_lim - te_gap) / 2
+    if te_gap != te_gap_set:
+        total_dy = (te_gap_set - te_gap) / 2
 
         upper_idxs = np.where(upper_coords[:, 0] > blend_start)[0]
         for i in upper_idxs:
@@ -309,8 +308,8 @@ def read_airfoil_coordinate_file(fpath: str, verbose: bool = True):
             yc -= dy
             lower_coords[i] = [xc, yc]
         if verbose:
-            Info('Detected airfoil ({}) with TE thinner than hardcoded limit\n-> artificially adjusted TE gap to {} '
-                     '(normalized)'.format(name, te_gap_lim))
+            Info('Detected airfoil ({}) with TE not equal to the requested value\n-> artificially adjusted TE gap to {} '
+                     '(normalized)'.format(name, te_gap_set))
 
     # re-combine upper and lower coords and split back into x, y arrays
     if upper_coords[-1][0] == lower_coords[0][0] and upper_coords[-1][1] == lower_coords[0][1]:  # check for double 0, 0
@@ -1156,6 +1155,8 @@ def angle_between(v1, v2):
 
 
 def compute_polygon_angles(exterior_coords: list):
+    if exterior_coords[0] == exterior_coords[-1]:
+        removed = exterior_coords.pop(-1)
     angles = []
     for i in range(len(exterior_coords)):
         pt = exterior_coords[i]
@@ -1172,7 +1173,7 @@ def compute_polygon_angles(exterior_coords: list):
     return angles
 
 
-def compute_profile_trimesh(profile_coords):
+def compute_profile_trimesh(profile_coords, reverse_order: bool = False):
     if len(profile_coords) == 3:
         xc, yc, zc = profile_coords
     elif len(profile_coords) == 2:
@@ -1200,7 +1201,10 @@ def compute_profile_trimesh(profile_coords):
         else:
             next_idx = min_idx + 1
         pt1, pt2, pt3 = points[prev_idx], points[min_idx], points[next_idx]
-        vector = [pt1, pt2, pt3]
+        if not reverse_order:
+            vector = [pt1, pt2, pt3]
+        else:
+            vector = [pt3, pt2, pt1]
         vectors.append(vector)
         _ = points.pop(min_idx)
 
