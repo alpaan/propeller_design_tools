@@ -346,6 +346,7 @@ class PDT_SpinBox(QtWidgets.QSpinBox):
 
     def set_box_range(self, box_range):
         if box_range is not None:
+            box_range = [int(v) for v in box_range]
             self.setRange(*box_range)   # the * unpacks this from tuple or list into 2 values min, max
 
     def set_box_single_step(self, box_single_step):

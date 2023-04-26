@@ -167,7 +167,7 @@ class PropellerCreationControlWidget(QtWidgets.QWidget):
         # extra geo params
         form_lay2c.addRow(PDT_Label('Extra Geometry Output Parameters', font_size=14, bold=True))
         self.skew_sb = PDT_DoubleSpinBox(font_size=12, width=80)
-        self.skew_sb.setMaximum(45)
+        self.skew_sb.setMaximum(70)
         form_lay2c.addRow(PDT_Label('Skew:', font_size=12), self.skew_sb)
         self.n_prof_pts_sb = PDT_SpinBox(font_size=12, width=80)
         self.n_prof_pts_sb.setSpecialValueText('None')
